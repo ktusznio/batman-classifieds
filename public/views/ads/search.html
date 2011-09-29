@@ -1,0 +1,24 @@
+<div class="row">
+  <div id="content" class="span10">
+
+    <h1>BUY SELL TRADE</h1>
+    <p class="welcome">Want to get rid of something that's lingering in your household stockpile? Are you hoarding those unwanted christmas and birthday presents or offer some kind of exotic service? Post it here.</p>
+
+    <div data-hideif="searchQueryError">
+      <h2>Showing <span data-bind="'listing' | pluralize searchAds.length | prepend ' ' | prepend searchAds.length"></span> for search query "<span data-bind="searchQuery"></span>"</h2>
+      <ul id="listings">
+        <li data-foreach-ad="searchAds" class="ad row">
+          <div data-partial="ads/_ad"></div>
+        </li>
+      </ul>
+    </div>
+    <div data-showif="searchQueryError" class="error">
+      Please enter a search query!
+    </div>
+
+  </div>
+
+  <div id="sidebar" class="span6" data-partial="ads/_index_sidebar"></div>
+</div>
+
+

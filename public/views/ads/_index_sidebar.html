@@ -1,0 +1,25 @@
+    <div data-partial="ads/_sidebar_create"></div>
+
+    <div id="your-ads">
+      <h2>Your current listings</h2>
+
+      <div data-showif="adsByUser[currentUser.id].length">
+        <ul data-foreach-ad="adsByUser[currentUser.id]">
+          <li class="ad">
+            <p class="edit">
+              <!--<a data-bind-href="'#!/ads/' | append ad.id | append '/edit'">edit this listing</a>-->
+              <a data-route="ad/edit">edit this listing</a>
+            </p>
+            <h3><a data-route="ad" data-bind="ad.title"></a></h3>
+            <p class="description" data-bind="ad.description | truncate 140"></p>
+          </li>
+        </ul>
+      </div>
+      <div data-hideif="adsByUser[currentUser.id].length">
+        You don't have any active ads. <a data-route="/ads/new">Create one</a>.
+      </div>
+    </div>
+
+    <div id="banner">
+    </div>
+

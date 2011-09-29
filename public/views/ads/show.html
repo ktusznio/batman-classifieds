@@ -1,0 +1,60 @@
+<div id="show-ad" class="row">
+  <div id="content" class="span10">
+    <h1 data-bind="ad.title"></h1>
+
+    <div class="price big-price">for <span data-bind="ad | displayPrice"/><span data-showif="ad.best_offer">or best offer</span></div>
+
+    <div data-bind="ad.description | simpleFormat | autolink"></div>
+
+    <div class="meta">
+      <span data-bind="ad.user.name"></span> posted this <span data-bind="ad.created_at | prettyDate"></span>
+      <a data-showif="currentUser.id | equals ad.user_id" data-route="ad/edit">Edit this ad</a>
+    </div>
+
+    <ul id="images">
+      <li data-foreach-image="ad.images" class="polaroid"><a data-bind-href="image.urls.medium"><img data-bind-src="image.urls.thumb"></a></li>
+      <li data-hideif="ad.images.length" class="polaroid"><img src="http://placekitten.com/g/140/140"></li>
+    </ul>
+
+    <div id="contact-form" class="well" data-hideif="currentUser.id | equals ad.user_id">
+      <h2>Are you interested in this?</h2>
+      <form data-formfor-message="ad.message" data-event-submit="sendMessage">
+        <div class="alert-message success" data-showif="messageSendSuccess.length" data-bind="messageSendSuccess" data-mixin="animation"></div>
+        <div id="error-explanation" class="alert-message block-message error" data-showif="message.errors.length">
+          <p><strong><span data-bind="message.errors.length"></span> <span data-bind="'error' | pluralize newAdErrorsLength"></span> prevented this message from being sent:</strong></p>
+          <ul>
+            <li data-foreach-error="message.errors.messages" data-bind="error"></li>
+          </ul>
+        </div>
+
+        <textarea cols="40" id="message_body" data-bind="message.body" rows="20"></textarea>
+        <div class="actions">
+          <input class="btn primary" name="commit" type="submit" value="Contact Seller">
+        </div>
+
+    </div>
+
+
+    <div data-showif="otherAds.length">
+      <h2>Others ads by this person</h2>
+
+      <ul id="listings">
+        <li data-foreach-ad="otherAds" class="ad row">
+          <div data-partial="ads/_ad"></div>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div id="sidebar" class="span6">
+    <div data-partial="ads/_sidebar_create"></div>
+
+    <div data-showif="ad.user | equals currentUser" class="highlight-box">
+      <h3>This is your listing</h3>
+      <p class="description">You should update it if it has sold or if you changed your mind and don't want to sell this item anymore.</p>
+      <p><a data-route="ads.close" class="btn danger primary">My item is no longer available</a></p>
+    </div>
+
+  </div>
+</div>

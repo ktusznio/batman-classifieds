@@ -1,0 +1,7 @@
+<%= @ad.user.first_name %>,
+
+<%= @user.display_name %> is interested in your ad '<%=raw @ad.title %>'. Following is the message from <%= @user.display_name %>:
+
+<%=raw block_format(@message) %>
+
+You can reply back to <%= @user.display_name %> by replying to this email.

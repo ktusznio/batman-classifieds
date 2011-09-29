@@ -1,0 +1,12 @@
+<div class="span2">
+  <div class="image polaroid">
+    <a data-bind-href="ad.images[0].urls.medium | default '#!/404'"><img data-bind-src="ad.images[0].urls.thumb | default 'http://placekitten.com/g/140/140'"/></a>
+  </div>
+</div>
+<div class="span8">
+  <p class="date" data-bind="ad.created_at | prettyDate"></p>
+  <h2><a data-route="ad" data-bind="ad.title"></a></h2>
+  <p class="description" data-bind="ad.description | autolink | truncate 140"></p>
+  <p class="details-link"><a data-route="ad" class="btn">View details &raquo;</a></p>
+  <p class="price"><span data-bind="ad | displayPrice"/><span data-showif="ad.best_offer">or best offer</span></p>
+</div>

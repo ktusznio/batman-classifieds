@@ -1,0 +1,148 @@
+h1 { font-size: 64px; line-height: 72px; color: #222; }
+h2 { font-weight: 200; }
+
+.price { font-family: Georgia; font-style: italic; }
+.welcome { font-size: 18px; color: #999; margin-bottom: 32px; font-weight: 200; line-height: 24px; }
+.highlight-box { background: #C7EEFE; border: 1px solid #ADE6FE; -webkit-border-radius:6px; -moz-border-radius:6px; border-radius:6px; padding: 10px 19px; color: #32536d; }
+.highlight-box form { margin-bottom: 0; }
+
+.topbar {
+  h1 { margin: 0; line-height: 24px; position: relative; border: 0; }
+  h1 a { display: block; float: left; font-size: 3px; line-height: 1; margin-left: -20px; padding: 5px 20px 2px; }
+  .fill { background-image: url(/assets/topbar-bg.png); background-repeat: repeat; border-bottom: 5px solid #7d3107; -webkit-box-shadow: 0 3px 8px rgba(0,0,0,.3); -moz-box-shadow: 0 3px 8px rgba(0,0,0,.3); }
+  #search { float: right; }
+  #login-user { float: right; padding: 10px 10px 0px; line-height: 24px; }
+}
+
+#main { margin-top: 100px; }
+
+#sidebar {
+  width: 340px;
+  h2 { font-size: 18px; }
+  #your-ads {
+    margin: 40px 0;
+    ul { list-style-type: none; margin-left: 0px;}
+    li { .highlight-box; padding: 0 10px; margin: 10px 0 15px;
+      h3 a { font-size: 15px; color: #0e4458; }
+      p { font-size: 12px; }
+    }
+  }
+
+  #banner { background: url(/assets/banner.jpg) top left no-repeat; width: 340px; height: 221px; -webkit-border-radius:6px; -moz-border-radius:6px; border-radius:6px; margin-bottom: 30px; }
+}
+
+.ad {
+  .details-link { float: right; }
+  .date, .edit { float: right; position: relative; top: 7px; }
+  .description { color: #333; }
+  .price { font-size: 16px; color: #999; }
+}
+
+#new-ad, #edit-ad {
+  legend { margin-bottom: 24px; }
+  form input[type="radio"] { margin-top: 8px; vertical-align: top; }
+  textarea { height: 240px; }
+  fieldset.tight {
+    .clearfix { margin-bottom: 5px; }
+  }
+
+  label { width: 110px; }
+  .input { margin-left: 130px; }
+  input[type="file"] { display: block; margin-bottom: 14px; }
+  .input-prepend {
+    display: inline-block;
+    float: left;
+    input { width: 60px; text-align: right; }
+  }
+
+  #price-field {
+    input { float: left; margin-right: 12px; }
+
+  }
+
+  #best-offer {
+    float: left;
+    padding: 4px;
+    width: 150px;
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    -webkit-border-radius:6px;
+    -moz-border-radius:6px;
+    border-radius:6px;
+    margin-left: 5px;
+    label { float: none; }
+  }
+
+  #best-offer.active { background: #A9DBA9; border-color: #46A546;
+    label {
+      color: #000;
+    }
+  }
+}
+
+#query.error {
+  border-color: 1px solid #C87872;
+}
+#error-explanation {
+  ul { margin: 10px 15px; }
+}
+
+#listings {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+
+  .row { padding: 10px 0; border-top: 1px dotted #ccc; }
+  h2 { font-size: 20px; }
+  div:first-child { margin-top: 5px; }
+
+  /* By default, we tilt all our images -2 degrees */
+  .polaroid {
+    width: 100px;
+    a { background: #fff; display: block; padding: 5px; -webkit-transform: rotate(-2deg); -moz-transform: rotate(-2deg); -webkit-box-shadow: 0 3px 6px rgba(0,0,0,.25); -moz-box-shadow: 0 3px 6px rgba(0,0,0,.25); -webkit-transition: -webkit-transform .15s linear;
+      img { width: 90px; height: 90px; }
+    }
+
+  }
+
+
+  /* Rotate all even images 2 degrees */
+  li:nth-child(even) .polaroid { -webkit-transform: rotate(2deg); -moz-transform: rotate(2deg); position: relative; top: -5px; }
+
+  /* Don't rotate every third image, but offset its position */
+  li:nth-child(3n) .polaroid { -webkit-transform: none; -moz-transform: none; position: relative; top: -5px; }
+
+  /* Rotate every fifth image by 5 degrees and offset it */
+  li:nth-child(5n) .polaroid { -webkit-transform: rotate(5deg); -moz-transform: rotate(5deg); position: relative; right: 5px; }
+
+  /* Scale the images on hover, add transitions for smoothing things out, and ensure the hover appears on top */
+  .polaroid a:hover { -webkit-transform: scale(1.5); -moz-transform: scale(1.5); position: relative; z-index: 5; -webkit-box-shadow: 0 3px 6px rgba(0,0,0,.5); -moz-box-shadow: 0 3px 6px rgba(0,0,0,.5); }
+}
+
+
+/* SHOW PAGE */
+
+#show-ad {
+  .actions { padding-left: 20px; }
+  .big-price { font-size: 24px; line-height: 36px; margin: 10px 0 20px; color: #aaa; font-weight: 200; }
+  .meta { font-family: Georgia; font-style: italic; border-top: 1px dotted #ccc; padding-top: 10px; margin: 20px 0 40px; }
+  h1 { margin-bottom: 0; font-size: 30px; line-height: 30px; }
+  h2 { margin: 10px 0; }
+  textarea { width: 500px; height: 200px; }
+
+  #contact-form {
+    padding-bottom: 0px;
+    margin-bottom: 40px;
+    .actions { padding-left: 0; }
+  }
+
+  #contact-form, #other-ads { margin-top: 30px; padding-top: 20px; border-top: 1px dotted #ccc; }
+
+  #images {
+    list-style-type: none;
+    margin: 20px 0;
+    li { display: inline; margin-left: 20px; }
+    li:first-child { margin-left: 0; }
+    .polaroid img { padding: 10px; -webkit-box-shadow: 0 3px 6px rgba(0,0,0,.25); -moz-box-shadow: 0 3px 6px rgba(0,0,0,.25); }
+  }
+}
