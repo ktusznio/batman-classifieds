@@ -7,6 +7,6 @@
   <p class="date" data-bind="ad.created_at | prettyDate"></p>
   <h2><a data-route="ad" data-bind="ad.title"></a></h2>
   <p class="description" data-bind="ad.description | autolink | truncate 140"></p>
-  <p class="details-link"><a data-route="ad" class="btn">View details &raquo;</a></p>
-  <p class="price"><span data-bind="ad | displayPrice"/><span data-showif="ad.best_offer">or best offer</span></p>
+  <p class="details-link"><a data-route="ad" data-bind="t.ads.show.view_details | t" class="btn"></a></p>
+  <p class="price"><span data-bind="ad | displayPrice"></span> <span data-showif="ad.best_offer" data-bind="t.ads.show.or_best_offer">or best offer</span></p>
 </div>

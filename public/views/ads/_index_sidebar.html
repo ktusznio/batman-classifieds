@@ -1,14 +1,14 @@
     <div data-partial="ads/_sidebar_create"></div>
 
     <div id="your-ads">
-      <h2>Your current listings</h2>
+      <h2 data-bind="t.sidebar.heading | t"></h2>
 
       <div data-showif="adsByUser[currentUser.id].length">
         <ul data-foreach-ad="adsByUser[currentUser.id]">
           <li class="ad">
             <p class="edit">
               <!--<a data-bind-href="'#!/ads/' | append ad.id | append '/edit'">edit this listing</a>-->
-              <a data-route="ad/edit">edit this listing</a>
+              <a data-route="ad/edit" data-bind="t.ads.edit.edit"></a>
             </p>
             <h3><a data-route="ad" data-bind="ad.title"></a></h3>
             <p class="description" data-bind="ad.description | truncate 140"></p>

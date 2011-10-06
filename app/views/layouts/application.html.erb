@@ -10,7 +10,6 @@
   <%= stylesheet_link_tag "/fancybox/jquery.fancybox-1.3.4.css" %>
   <%= javascript_include_tag "application" %>
   <%= javascript_include_tag "/fancybox/jquery.fancybox-1.3.4.pack.js" %>
-
 </head>
 <body>
 
@@ -31,6 +30,20 @@
           </li>
         </ul>
       </div>
+      <div id="locales">
+        <div>
+          <img data-bind-src="'/images/' | append Batman.I18N.locale | append '.png'">
+          <span data-bind="Classifieds.locale"></span>
+        </div>
+        <ul>
+          <li data-foreach-locale="Classifieds.availableLocales">
+            <a data-bind-href="'/?locale=' | append locale">
+              <img data-bind-src="'/images/' | append locale | append '.png'">
+              <span data-bind="locale"></span>
+            </a>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 
@@ -42,6 +55,8 @@
       <p>&copy; Shopify <%= Time.now.year %></p>
     </footer>
   </div>
-
+  <script type="text/javascript">
+    Batman.I18N.set('locale', '<%= I18n.locale.to_s %>');
+  </script>
 </body>
 </html>

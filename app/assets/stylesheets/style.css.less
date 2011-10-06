@@ -12,6 +12,41 @@ h2 { font-weight: 200; }
   .fill { background-image: url(/assets/topbar-bg.png); background-repeat: repeat; border-bottom: 5px solid #7d3107; -webkit-box-shadow: 0 3px 8px rgba(0,0,0,.3); -moz-box-shadow: 0 3px 8px rgba(0,0,0,.3); }
   #search { float: right; }
   #login-user { float: right; padding: 10px 10px 0px; line-height: 24px; }
+  #locales {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    div {margin: 5px 10px 10px 0px;}
+    ul {
+      list-style-type: none;
+      display: none;
+      margin: 0px;
+      li {
+        float: none;
+        background-color: rgba(20, 20, 20, 0.7);
+        padding: 1px;
+        cursor: pointer;
+        a {
+        }
+      }
+      li:first-child {
+        border-top-left-radius:3px;
+        border-top-right-radius:3px;
+      }
+      li:last-child {
+        border-bottom-left-radius:3px;
+        border-bottom-right-radius:3px;
+      }
+    }
+    &:hover {
+      ul {
+        display: block;
+      }
+      div {
+        display: none;
+      }
+    }
+  }
 }
 
 #main { margin-top: 100px; }

@@ -13,6 +13,7 @@ Classifieds::Application.routes.draw do
   end
 
   resources :messages, :only => [:create]
+  resources :locales, :only => [:show], :constraints => {:id => /en|fr|pr/}
 
   match '/login', :to => 'sessions#new', :as => :login
   match '/auth/:provider/callback', :to => 'sessions#create'

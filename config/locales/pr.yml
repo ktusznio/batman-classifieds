@@ -1,8 +1,6 @@
-# US English translations for Ruby on Rails
-#
-# Use this as the base for the locale file of your language.
+# Pirate English translations for Ruby on Rails
 
-en:
+pr:
   date:
     formats:
       default: "%Y-%m-%d"
@@ -10,13 +8,13 @@ en:
       long: "%B %d, %Y"
 
     day_names:
-      - Sunday
-      - Monday
-      - Tuesday
-      - Wednesday
-      - Thursday
-      - Friday
-      - Saturday
+      - Sundaye
+      - Mondaye
+      - Tuesdaye
+      - Wednesdaye
+      - Thursdaye
+      - Fridaye
+      - Saturdaye
     abbr_day_names:
       - Sun
       - Mon
@@ -70,11 +68,11 @@ en:
   support:
     array:
       words_connector: ", "
-      two_words_connector: " and "
-      last_word_connector: ", and "
+      two_words_connector: " an' "
+      last_word_connector: ", an' "
 
     select:
-      prompt: "Please select"
+      prompt: "Pick un:"
 
   number:
     format:
@@ -87,7 +85,7 @@ en:
     currency:
       format:
         format: "%u%n"
-        unit: "$"
+        unit: "golds"
         separator: "."
         delimiter: ","
         precision: 2
@@ -185,36 +183,36 @@ en:
     format: "%{attribute} %{message}"
 
     messages: &errors_messages
-      inclusion: "is not included in the list"
+      inclusion: "ain't part o' the list"
       exclusion: "is reserved"
-      invalid: "is invalid"
-      confirmation: "doesn't match confirmation"
-      accepted: "must be accepted"
+      invalid: "ain't proper"
+      confirmation: "doesn't match the other un!"
+      accepted: "gots to be checked!"
       empty: "can't be empty"
       blank: "can't be blank"
-      too_long: "is too long (maximum is %{count} characters)"
-      too_short: "is too short (minimum is %{count} characters)"
-      wrong_length: "is the wrong length (should be %{count} characters)"
-      not_a_number: "is not a number"
-      not_an_integer: "must be an integer"
-      greater_than: "must be greater than %{count}"
-      greater_than_or_equal_to: "must be greater than or equal to %{count}"
-      equal_to: "must be equal to %{count}"
-      less_than: "must be less than %{count}"
-      less_than_or_equal_to: "must be less than or equal to %{count}"
-      odd: "must be odd"
-      even: "must be even"
+      too_long: "is longer than Longbeard's beard!"
+      too_short: "is shorter than Shortbeard's beard!"
+      wrong_length: "is the wrong length (should be %{count} long)"
+      not_a_number: "isn't a number, can't you read?!"
+      not_an_integer: "must be an round number, who cares about pennies!"
+      greater_than: "must be more than %{count}, what kind o pirate are ye?"
+      greater_than_or_equal_to: "must be greater than or equal to %{count}, what kind o pirate are ye?"
+      equal_to: "must be equal to %{count}, what kind o pirate are ye?"
+      less_than: "must be less than %{count}, what kind o pirate are ye?"
+      less_than_or_equal_to: "must be less than or equal to %{count}, what kind o pirate are ye?"
+      odd: "must be odd, can't you read?!"
+      even: "must be even, can't you read?!"
 
   activerecord:
     errors:
       template:
         header:
-          one:    "1 error prohibited this %{model} from being saved"
-          other:  "%{count} errors prohibited this %{model} from being saved"
-        body: "There were problems with the following fields:"
+          one:    "Ye can't be saving this %{model} due this error:"
+          other:  "Ye can't be saving this here %{model} due to these %{count} errors:"
+        body: "The captain won't be pleased about these fields:"
 
       messages:
-        taken: "has already been taken"
+        taken: "has already been pilliaged! Steal it back!"
         record_invalid: "Validation failed: %{errors}"
         <<: *errors_messages
 
@@ -222,39 +220,38 @@ en:
         format: "%{attribute} %{message}"
 
   index:
-    heading: "BUY SELL TRADE"
-    welcome_text: "Want to get rid of something that's lingering in your household stockpile? Are you hoarding those unwanted christmas and birthday presents or offer some kind of exotic service? Post it here."
+    heading: "PILFER PILLIAGE SWAP"
+    welcome_text: "Wish to be rid of your less-than-stellar booty? Got so much gold yer chest is too heavy to lift? Arrr you hoarding all ye eyepaches or do ye need a new un? Make an arrrfor here!"
     showing_listings:
-      one: "Showing 1 advertisment"
-      other: "Showing %{count} advertisments"
+      one: "Showin' an advertisment"
+      other: "Showin' %{count} advertisments"
 
   search:
     showing_listings:
-      one: "Showing one advertisment for search '%{searchQuery}'"
-      other: "Showing %{count} advertisments for search '%{searchQuery}'"
-
+      one: "Showin' an advertisment for yer terms '%{searchQuery}'"
+      other: "Showin' %{count} advertisments for yer terms '%{searchQuery}'"
   sidebar:
-    heading: "Your current listings"
+    heading: "Yer current offerin's"
     topbox:
-      heading: "Come Clean"
-      blurb: "Let us help you help us by sharing your worldly possessions with your fellow co-workers"
-      button: "Post something &raquo;"
+      heading: "Get Clean"
+      blurb: "Sell yer pilliaged booty to some unsuspectin' shipmates such that when the guards come yer stash isn't evidence o'yer wrong doin'!"
+      button: "Don't go to the gallows &raquo;"
   ads:
     show:
-      view_details: "View details &raquo;"
-      or_best_offer: "or best offer"
+      view_details: "See if it shimmerrsss &raquo;"
+      or_best_offer: "but I'll give yer a deal"
     new:
       header: "Post yerself a new advertisment"
     edit:
-      header: "Edit your ad"
+      edit: "edit yer ad"
     form:
       labels:
-        offering: "I'm offering"
-        sale_type_price: "For a price"
-        sale_type_free: "For Free"
-        sale_type_trade: "Trade/Swap"
-        description: "Description"
-        images: "Upload Images"
+        offering: "Offerin'"
+        sale_type_price: "Fer gold"
+        sale_type_free: "Fer FREE!"
+        sale_type_trade: "Fer barterin'"
+        description: "The nature o'yer booty"
+        images: "Magic portraits"
       buttons:
-        submit: "Submit"
-        cancel: "Cancel"
+        submit: "FAIIIRREEEE!!"
+        cancel: "Return to land"

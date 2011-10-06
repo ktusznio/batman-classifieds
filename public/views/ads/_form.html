@@ -1,5 +1,5 @@
 <fieldset>
-  <legend><span data-showif="ad.isNew">Post a new classified ad</span><span data-hideif="ad.isNew">Edit your ad</span></legend>
+  <legend><span data-showif="ad.isNew" data-bind="t.ads.new.header | t"></span><span data-hideif="ad.isNew" data-bind="t.ads.edit.header | t"></span></legend>
 
   <div id="error-explanation" class="alert-message block-message error" data-showif="ad.errors.length">
     <p><strong><span data-bind="ad.errors.length"></span> <span data-bind="'error' | pluralize ad.errors.length"></span> prevented this add from being created:</strong></p>
@@ -9,7 +9,7 @@
   </div>
 
   <div class="clearfix" data-addclass-error="ad.errors['title'].length">
-    <label for="ad_title">I'm offering</label>
+    <label for="ad_title" data-bind="t.ads.form.labels.offering | t"></label>
     <div class="input">
       <input id="ad_title" name="ad[title]" data-bind="ad.title" size="30" type="text">
     </div>
@@ -18,7 +18,7 @@
 
 <fieldset class="tight">
   <div class="clearfix" data-addclass-error="ad.errors['price'].length" data-addclass-error="ad.errors['best_offer'].length">
-    <label for="ad_sale_type_fixed">For a price</label>
+    <label for="ad_sale_type_fixed" data-bind="t.ads.form.labels.sale_type_price | t"></label>
     <div id="price-field" class="input">
       <input data-bind="ad.sale_type" checked="checked" id="ad_sale_type_fixed" name="ad[sale_type]" type="radio" value="fixed">
       <div class="input-prepend">
@@ -31,7 +31,7 @@
           <input data-bind="ad.best_offer" data-bind-disabled="ad.sale_type | equals 'fixed' | not" id="ad_best_offer" name="ad[best_offer]" type="checkbox">
         </span>
         <span>
-          <label for="ad_best_offer">Or for best offer</label>
+          <label for="ad_best_offer" data-bind="t.ads.show.or_best_offer | t"></label>
         </span>
       </div>
 
@@ -39,14 +39,14 @@
   </div>
 
   <div class="clearfix">
-    <label for="ad_sale_type_free">For Free</label>
+    <label for="ad_sale_type_free" data-bind="t.ads.form.labels.sale_type_free | t"></label>
     <div class="input">
       <input data-bind="ad.sale_type" id="ad_sale_type_free" name="ad[sale_type]" type="radio" value="free">
     </div>
   </div>
 
   <div class="clearfix">
-    <label for="ad_sale_type_trade">Trade/Swap</label>
+    <label for="ad_sale_type_trade" data-bind="t.ads.form.labels.sale_type_trade | t"></label>
     <div class="input">
       <input data-bind="ad.sale_type" id="ad_sale_type_trade" name="ad[sale_type]" type="radio" value="trade">
     </div>
@@ -60,7 +60,7 @@
 
 <fieldset>
   <div class="clearfix " data-addclass-error="ad.errors['description'].length">
-    <label for="ad_description">Description</label>
+    <label for="ad_description" data-bind="t.ads.form.labels.description | t"></label>
     <div class="input">
       <textarea data-bind="ad.description" cols="40" id="ad_description" name="ad[description]" rows="20"></textarea>
     </div>
@@ -69,7 +69,7 @@
 
 <fieldset>
   <div class="clearfix">
-    <label>Upload Images</label>
+    <label data-bind="t.ads.form.labels.images"></label>
 
     <div class="input">
       <input type="file" multiple data-bind="ad.images_attributes">
@@ -79,7 +79,7 @@
 
 
 <div class="actions">
-  <input class="btn primary" name="commit" type="submit" value="Submit">
+  <input class="btn primary" name="commit" type="submit" data-bind="t.ads.form.buttons.submit | t">
 
-  <a href="/" class="btn">Cancel</a>
+  <a href="/" class="btn" data-bind="t.ads.form.buttons.cancel | t"></a>
 </div>

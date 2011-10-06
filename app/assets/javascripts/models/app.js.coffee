@@ -11,7 +11,9 @@ window.Classifieds = class Classifieds extends Batman.App
   @route '/ads/:id', 'ads#show', resource: 'ads', action: 'show'
   @route '/ads/:id/edit', 'ads#edit', resource: 'ads', action: 'edit'
   @route '/ads/new', 'ads#new', resource: 'ads', action: 'new'
-  @route '/search', 'ads#search', resource: 'ads', action: 'search'
+  @route('/search', 'ads#search', {resource: 'ads', action: 'search'})
+
+  @availableLocales: ['en', 'pr', 'fr']
 
   @on 'run', ->
     user = new Classifieds.User()

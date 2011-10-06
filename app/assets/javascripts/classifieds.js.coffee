@@ -1,6 +1,7 @@
 #= require batman/batman
 #= require batman/batman.jquery
-#= require batman/batman.rails
+#= require batman/extras/batman.rails
+#= require batman/extras/batman.i18n
 
 #= require ./models/app
 
