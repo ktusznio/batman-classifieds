@@ -14,6 +14,8 @@ gem 'aws-s3'
 gem 'json'
 gem 'jquery-rails'
 gem 'rails_autolink'
+gem 'batman-rails'
+gem 'heroku'
 
 group :assets do
   gem 'less', "2.0.6"

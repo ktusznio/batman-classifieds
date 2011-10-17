@@ -102,20 +102,23 @@ h2 { font-weight: 200; }
     a { background: #fff; display: block; padding: 5px; -webkit-transform: rotate(-2deg); -moz-transform: rotate(-2deg); -webkit-box-shadow: 0 3px 6px rgba(0,0,0,.25); -moz-box-shadow: 0 3px 6px rgba(0,0,0,.25); -webkit-transition: -webkit-transform .15s linear;
       img { width: 90px; height: 90px; }
     }
+    a { background: #fff; display: block; padding: 5px;
+      img { width: 90px; height: 90px; }
+    }
 
   }
 
 
-  /* Rotate all even images 2 degrees */
+  /*[> Rotate all even images 2 degrees <]*/
   li:nth-child(even) .polaroid { -webkit-transform: rotate(2deg); -moz-transform: rotate(2deg); position: relative; top: -5px; }
 
-  /* Don't rotate every third image, but offset its position */
+  /*[> Don't rotate every third image, but offset its position <]*/
   li:nth-child(3n) .polaroid { -webkit-transform: none; -moz-transform: none; position: relative; top: -5px; }
 
-  /* Rotate every fifth image by 5 degrees and offset it */
+  /*[> Rotate every fifth image by 5 degrees and offset it <]*/
   li:nth-child(5n) .polaroid { -webkit-transform: rotate(5deg); -moz-transform: rotate(5deg); position: relative; right: 5px; }
 
-  /* Scale the images on hover, add transitions for smoothing things out, and ensure the hover appears on top */
+  /*[> Scale the images on hover, add transitions for smoothing things out, and ensure the hover appears on top <]*/
   .polaroid a:hover { -webkit-transform: scale(1.5); -moz-transform: scale(1.5); position: relative; z-index: 5; -webkit-box-shadow: 0 3px 6px rgba(0,0,0,.5); -moz-box-shadow: 0 3px 6px rgba(0,0,0,.5); }
 }
 

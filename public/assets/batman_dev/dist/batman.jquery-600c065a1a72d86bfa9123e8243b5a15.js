@@ -1,5 +1,5 @@
 (function() {
-  var $addEventListener, $block, $extendsEnumerable, $findName, $functionName, $get, $isChildOf, $mixin, $passError, $preventDefault, $redirect, $removeEventListener, $typeOf, $unmixin, Batman, BatmanObject, Binding, RenderContext, Validators, buntUndefined, camelize_rx, capitalize_rx, container, developer, div, filters, helpers, isEmptyDataObject, k, mixins, underscore_rx1, underscore_rx2, _Batman, _fn, _i, _j, _len, _len2, _objectToString, _ref, _ref2;
+  var $addEventListener, $block, $extendsEnumerable, $findName, $functionName, $get, $hasAddEventListener, $isChildOf, $mixin, $passError, $preventDefault, $redirect, $removeEventListener, $removeNode, $setInnerHTML, $typeOf, $unbindNode, $unbindTree, $unmixin, Batman, BatmanObject, Binding, Validators, buntUndefined, camelize_rx, capitalize_rx, container, developer, div, filters, helpers, isEmptyDataObject, k, mixins, t, underscore_rx1, underscore_rx2, _Batman, _i, _len, _objectToString, _ref, _stateMachine_setState;
   var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -133,7 +133,18 @@
     }
     return false;
   };
+  Batman.translate = function(x, values) {
+    if (values == null) {
+      values = {};
+    }
+    return helpers.interpolate($get(Batman.translate.messages, x), values);
+  };
+  Batman.translate.messages = {};
+  t = function() {
+    return Batman.translate.apply(Batman, arguments);
+  };
   developer = {
+    suppressed: false,
     DevelopmentError: (function() {
       var DevelopmentError;
       DevelopmentError = function(message) {
@@ -157,8 +168,18 @@
       }
       return _results;
     },
+    suppress: function(f) {
+      developer.suppressed = true;
+      if (f) {
+        f();
+        return developer.suppressed = false;
+      }
+    },
+    unsuppress: function() {
+      return developer.suppressed = false;
+    },
     log: function() {
-      if ((typeof console !== "undefined" && console !== null ? console.log : void 0) == null) {
+      if (developer.suppressed || !((typeof console !== "undefined" && console !== null ? console.log : void 0) != null)) {
         return;
       }
       if (console.log.apply) {
@@ -168,7 +189,7 @@
       }
     },
     warn: function() {
-      if ((typeof console !== "undefined" && console !== null ? console.warn : void 0) == null) {
+      if (developer.suppressed || !((typeof console !== "undefined" && console !== null ? console.warn : void 0) != null)) {
         return;
       }
       if (console.warn.apply) {
@@ -185,6 +206,9 @@
         return developer.error(message);
       }
     },
+    "do": function(f) {
+      return f();
+    },
     addFilters: function() {
       return $mixin(Batman.Filters, {
         log: function(value, key) {
@@ -199,14 +223,6 @@
           if (typeof console !== "undefined" && console !== null) {
             if (typeof console.log === "function") {
               console.log(developer.currentFilterStack);
-            }
-          }
-          return value;
-        },
-        logContext: function(value) {
-          if (typeof console !== "undefined" && console !== null) {
-            if (typeof console.log === "function") {
-              console.log(developer.currentFilterContext);
             }
           }
           return value;
@@ -274,6 +290,22 @@
       } else {
         return "";
       }
+    },
+    interpolate: function(stringOrObject, keys) {
+      var key, string, value;
+      if (typeof stringOrObject === 'object') {
+        string = stringOrObject[keys.count];
+        if (!string) {
+          string = stringOrObject['other'];
+        }
+      } else {
+        string = stringOrObject;
+      }
+      for (key in keys) {
+        value = keys[key];
+        string = string.replace(new RegExp("%\\{" + key + "\\}", "g"), value);
+      }
+      return string;
     }
   };
   Batman.Event = (function() {
@@ -293,6 +325,13 @@
     Event.prototype.isEvent = true;
     Event.prototype.isEqual = function(other) {
       return this.constructor === other.constructor && this.base === other.base && this.key === other.key;
+    };
+    Event.prototype.hashKey = function() {
+      var key;
+      this.hashKey = function() {
+        return key;
+      };
+      return key = "<Batman.Event base: " + (Batman.Hash.prototype.hashKeyFor(this.base)) + ", key: \"" + (Batman.Hash.prototype.hashKeyFor(this.key)) + "\">";
     };
     Event.prototype.addHandler = function(handler) {
       this.handlers.add(handler);
@@ -323,12 +362,13 @@
       return this.base;
     };
     Event.prototype.prevent = function() {
-      return this._preventCount++;
+      return ++this._preventCount;
     };
     Event.prototype.allow = function() {
-      if (this._preventCount > 0) {
-        return this._preventCount--;
+      if (this._preventCount) {
+        --this._preventCount;
       }
+      return this._preventCount;
     };
     Event.prototype.isPrevented = function() {
       return this._preventCount > 0;
@@ -359,19 +399,6 @@
     };
     return Event;
   })();
-  Batman.PropertyEvent = (function() {
-    __extends(PropertyEvent, Batman.Event);
-    function PropertyEvent() {
-      PropertyEvent.__super__.constructor.apply(this, arguments);
-    }
-    PropertyEvent.prototype.eachHandler = function(iterator) {
-      return this.base.eachObserver(iterator);
-    };
-    PropertyEvent.prototype.handlerContext = function() {
-      return this.base.base;
-    };
-    return PropertyEvent;
-  })();
   Batman.EventEmitter = {
     isEventEmitter: true,
     event: function(key) {
@@ -401,21 +428,37 @@
         this.event('change').fire(this, this);
         return result;
       };
+    },
+    prevent: function(key) {
+      this.event(key).prevent();
+      return this;
+    },
+    allow: function(key) {
+      this.event(key).allow();
+      return this;
+    },
+    isPrevented: function(key) {
+      return this.event(key).isPrevented();
+    },
+    fire: function() {
+      var args, key, _ref;
+      key = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      return (_ref = this.event(key)).fire.apply(_ref, args);
     }
   };
-  _ref = ['prevent', 'allow', 'fire', 'isPrevented'];
-  _fn = function(k) {
-    return Batman.EventEmitter[k] = function() {
-      var args, key, _ref2;
-      key = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      (_ref2 = this.event(key))[k].apply(_ref2, args);
-      return this;
+  Batman.PropertyEvent = (function() {
+    __extends(PropertyEvent, Batman.Event);
+    function PropertyEvent() {
+      PropertyEvent.__super__.constructor.apply(this, arguments);
+    }
+    PropertyEvent.prototype.eachHandler = function(iterator) {
+      return this.base.eachObserver(iterator);
     };
-  };
-  for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-    k = _ref[_i];
-    _fn(k);
-  }
+    PropertyEvent.prototype.handlerContext = function() {
+      return this.base.base;
+    };
+    return PropertyEvent;
+  })();
   Batman.Property = (function() {
     $mixin(Property.prototype, Batman.EventEmitter);
     Property._sourceTrackerStack = [];
@@ -445,16 +488,17 @@
       }
     };
     Property.registerSource = function(obj) {
-      var _ref2;
+      var _ref;
       if (!obj.isEventEmitter) {
         return;
       }
-      return (_ref2 = this.sourceTracker()) != null ? _ref2.add(obj) : void 0;
+      return (_ref = this.sourceTracker()) != null ? _ref.add(obj) : void 0;
     };
     function Property(base, key) {
       this.base = base;
       this.key = key;
     }
+    Property.prototype._isolationCount = 0;
     Property.prototype.cached = false;
     Property.prototype.value = null;
     Property.prototype.sources = null;
@@ -463,19 +507,34 @@
     Property.prototype.isEqual = function(other) {
       return this.constructor === other.constructor && this.base === other.base && this.key === other.key;
     };
+    Property.prototype.hashKey = function() {
+      var key;
+      this.hashKey = function() {
+        return key;
+      };
+      return key = "<Batman.Property base: " + (Batman.Hash.prototype.hashKeyFor(this.base)) + ", key: \"" + (Batman.Hash.prototype.hashKeyFor(this.key)) + "\">";
+    };
+    Property.prototype.changeEvent = function() {
+      var event;
+      event = this.event('change');
+      this.changeEvent = function() {
+        return event;
+      };
+      return event;
+    };
     Property.prototype.accessor = function() {
-      var accessors, val, _ref2, _ref3;
-      accessors = (_ref2 = this.base._batman) != null ? _ref2.get('keyAccessors') : void 0;
-      if (accessors && (val = accessors.get(this.key))) {
-        return val;
-      } else {
-        return ((_ref3 = this.base._batman) != null ? _ref3.getFirst('defaultAccessor') : void 0) || Batman.Property.defaultAccessor;
-      }
+      var accessor, keyAccessors, val, _ref, _ref2;
+      keyAccessors = (_ref = this.base._batman) != null ? _ref.get('keyAccessors') : void 0;
+      accessor = keyAccessors && (val = keyAccessors.get(this.key)) ? val : ((_ref2 = this.base._batman) != null ? _ref2.getFirst('defaultAccessor') : void 0) || Batman.Property.defaultAccessor;
+      this.accessor = function() {
+        return accessor;
+      };
+      return accessor;
     };
     Property.prototype.eachObserver = function(iterator) {
       var key;
       key = this.key;
-      this.event('change').handlers.forEach(iterator);
+      this.changeEvent().handlers.forEach(iterator);
       if (this.base.isObservable) {
         return this.base._batman.ancestors(function(ancestor) {
           var handlers, property;
@@ -487,24 +546,27 @@
         });
       }
     };
-    Property.prototype.sourceChangeHandler = function() {
-      return this._sourceChangeHandler || (this._sourceChangeHandler = this.refreshCacheAndSources.bind(this));
-    };
     Property.prototype.pushSourceTracker = function() {
       return Batman.Property._sourceTrackerStack.push(new Batman.SimpleSet);
     };
     Property.prototype.updateSourcesFromTracker = function() {
-      var newSources, sourceChangeHandler;
+      var handler, newSources;
       newSources = Batman.Property._sourceTrackerStack.pop();
-      sourceChangeHandler = this.sourceChangeHandler();
-      if (this.sources) {
-        this.sources.forEach(function(source) {
-          return source.event('change').removeHandler(sourceChangeHandler);
-        });
-      }
+      handler = this.sourceChangeHandler();
+      this._eachSourceChangeEvent(function(e) {
+        return e.removeHandler(handler);
+      });
       this.sources = newSources;
+      return this._eachSourceChangeEvent(function(e) {
+        return e.addHandler(handler);
+      });
+    };
+    Property.prototype._eachSourceChangeEvent = function(iterator) {
+      if (this.sources == null) {
+        return;
+      }
       return this.sources.forEach(function(source) {
-        return source.event('change').addHandler(sourceChangeHandler);
+        return iterator(source.event('change'));
       });
     };
     Property.prototype.getValue = function() {
@@ -517,36 +579,56 @@
       }
       return this.value;
     };
-    Property.prototype.refreshCacheAndSources = function() {
+    Property.prototype.refresh = function() {
       var previousValue, value;
       this.cached = false;
       previousValue = this.value;
       value = this.getValue();
-      if (value !== previousValue) {
+      if (value !== previousValue && !this.isIsolated()) {
         return this.fire(value, previousValue);
       }
     };
+    Property.prototype.sourceChangeHandler = function() {
+      var handler;
+      handler = __bind(function() {
+        return this._handleSourceChange();
+      }, this);
+      this.sourceChangeHandler = function() {
+        return handler;
+      };
+      return handler;
+    };
+    Property.prototype._handleSourceChange = function() {
+      if (this.isIsolated()) {
+        return this._needsRefresh = true;
+      } else if (this.changeEvent().handlers.isEmpty()) {
+        return this.cached = false;
+      } else {
+        return this.refresh();
+      }
+    };
     Property.prototype.valueFromAccessor = function() {
-      var _ref2, _ref3;
-      return (_ref2 = this.accessor()) != null ? (_ref3 = _ref2.get) != null ? _ref3.call(this.base, this.key) : void 0 : void 0;
+      var _ref;
+      return (_ref = this.accessor().get) != null ? _ref.call(this.base, this.key) : void 0;
     };
     Property.prototype.setValue = function(val) {
-      var result, _ref2, _ref3;
-      result = (_ref2 = this.accessor()) != null ? (_ref3 = _ref2.set) != null ? _ref3.call(this.base, this.key, val) : void 0 : void 0;
-      this.refreshCacheAndSources();
+      var result, _ref;
+      this.cached = false;
+      result = (_ref = this.accessor().set) != null ? _ref.call(this.base, this.key, val) : void 0;
+      this.refresh();
       return result;
     };
     Property.prototype.unsetValue = function() {
-      var result, _ref2, _ref3;
-      result = (_ref2 = this.accessor()) != null ? (_ref3 = _ref2.unset) != null ? _ref3.call(this.base, this.key) : void 0 : void 0;
-      this.refreshCacheAndSources();
+      var result, _ref;
+      result = (_ref = this.accessor().unset) != null ? _ref.call(this.base, this.key) : void 0;
+      this.refresh();
       return result;
     };
     Property.prototype.forget = function(handler) {
       if (handler != null) {
-        return this.event('change').removeHandler(handler);
+        return this.changeEvent().removeHandler(handler);
       } else {
-        return this.event('change').handlers.clear();
+        return this.changeEvent().handlers.clear();
       }
     };
     Property.prototype.observeAndFire = function(handler) {
@@ -554,22 +636,36 @@
       return handler.call(this.base, this.value, this.value);
     };
     Property.prototype.observe = function(handler) {
-      this.event('change').addHandler(handler);
+      this.changeEvent().addHandler(handler);
       this.getValue();
       return this;
     };
-    Property.prototype.prevent = function() {
-      return this.event('change').prevent();
-    };
-    Property.prototype.allow = function() {
-      return this.event('change').allow();
-    };
     Property.prototype.fire = function() {
-      var _ref2;
-      return (_ref2 = this.event('change')).fire.apply(_ref2, arguments);
+      var _ref;
+      return (_ref = this.changeEvent()).fire.apply(_ref, arguments);
     };
-    Property.prototype.isPrevented = function() {
-      return this.event('change').isPrevented();
+    Property.prototype.isolate = function() {
+      if (this._isolationCount === 0) {
+        this._preIsolationValue = this.getValue();
+      }
+      return this._isolationCount++;
+    };
+    Property.prototype.expose = function() {
+      if (this._isolationCount === 1) {
+        this._isolationCount--;
+        if (this._needsRefresh) {
+          this.value = this._preIsolationValue;
+          this.refresh();
+        } else if (this.value !== this._preIsolationValue) {
+          this.fire(this.value, this._preIsolationValue);
+        }
+        return this._preIsolationValue = null;
+      } else if (this._isolationCount > 0) {
+        return this._isolationCount--;
+      }
+    };
+    Property.prototype.isIsolated = function() {
+      return this._isolationCount > 0;
     };
     return Property;
   })();
@@ -586,14 +682,14 @@
       Keypath.__super__.constructor.apply(this, arguments);
     }
     Keypath.prototype.slice = function(begin, end) {
-      var base, segment, _j, _len2, _ref2;
+      var base, segment, _i, _len, _ref;
       if (end == null) {
         end = this.depth;
       }
       base = this.base;
-      _ref2 = this.segments.slice(0, begin);
-      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-        segment = _ref2[_j];
+      _ref = this.segments.slice(0, begin);
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        segment = _ref[_i];
         if (!((base != null) && (base = Batman.Property.forBaseAndKey(base, segment).getValue()))) {
           return;
         }
@@ -604,27 +700,27 @@
       return this.slice(-1);
     };
     Keypath.prototype.valueFromAccessor = function() {
-      var _ref2;
+      var _ref;
       if (this.depth === 1) {
         return Keypath.__super__.valueFromAccessor.apply(this, arguments);
       } else {
-        return (_ref2 = this.terminalProperty()) != null ? _ref2.getValue() : void 0;
+        return (_ref = this.terminalProperty()) != null ? _ref.getValue() : void 0;
       }
     };
     Keypath.prototype.setValue = function(val) {
-      var _ref2;
+      var _ref;
       if (this.depth === 1) {
         return Keypath.__super__.setValue.apply(this, arguments);
       } else {
-        return (_ref2 = this.terminalProperty()) != null ? _ref2.setValue(val) : void 0;
+        return (_ref = this.terminalProperty()) != null ? _ref.setValue(val) : void 0;
       }
     };
     Keypath.prototype.unsetValue = function() {
-      var _ref2;
+      var _ref;
       if (this.depth === 1) {
         return Keypath.__super__.unsetValue.apply(this, arguments);
       } else {
-        return (_ref2 = this.terminalProperty()) != null ? _ref2.unsetValue() : void 0;
+        return (_ref = this.terminalProperty()) != null ? _ref.unsetValue() : void 0;
       }
     };
     return Keypath;
@@ -667,23 +763,23 @@
       return this;
     },
     observe: function() {
-      var args, key, _ref2;
+      var args, key, _ref;
       key = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      (_ref2 = this.property(key)).observe.apply(_ref2, args);
+      (_ref = this.property(key)).observe.apply(_ref, args);
       return this;
     },
     observeAndFire: function() {
-      var args, key, _ref2;
+      var args, key, _ref;
       key = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      (_ref2 = this.property(key)).observeAndFire.apply(_ref2, args);
+      (_ref = this.property(key)).observeAndFire.apply(_ref, args);
       return this;
     }
   };
-  $get = Batman.get = function(object, key) {
-    if (object.get) {
-      return object.get(key);
+  $get = Batman.get = function(base, key) {
+    if ((base.get != null) && typeof base.get === 'function') {
+      return base.get(key);
     } else {
-      return Batman.Observable.get.call(object, key);
+      return Batman.Property.forBaseAndKey(base, key).getValue();
     }
   };
   Batman.initializeObject = function(object) {
@@ -741,8 +837,8 @@
         getter = keyOrGetter;
       } else {
         getter = function(ancestor) {
-          var _ref2;
-          return (_ref2 = ancestor._batman) != null ? _ref2[keyOrGetter] : void 0;
+          var _ref;
+          return (_ref = ancestor._batman) != null ? _ref[keyOrGetter] : void 0;
         };
       }
       results = this.ancestors(getter);
@@ -752,7 +848,7 @@
       return results;
     };
     _Batman.prototype.ancestors = function(getter) {
-      var isClass, parent, proto, results, val, _ref2;
+      var isClass, parent, proto, results, val, _ref;
       if (getter == null) {
         getter = function(x) {
           return x;
@@ -760,7 +856,7 @@
       }
       results = [];
       isClass = !!this.object.prototype;
-      parent = isClass ? (_ref2 = this.object.__super__) != null ? _ref2.constructor : void 0 : (proto = Object.getPrototypeOf(this.object)) === this.object ? this.object.constructor.__super__ : proto;
+      parent = isClass ? (_ref = this.object.__super__) != null ? _ref.constructor : void 0 : (proto = Object.getPrototypeOf(this.object)) === this.object ? this.object.constructor.__super__ : proto;
       if (parent != null) {
         val = getter(parent);
         if (val != null) {
@@ -778,7 +874,7 @@
     return _Batman;
   })();
   BatmanObject = (function() {
-    var getAccessorObject;
+    var counter, getAccessorObject;
     Batman.initializeObject(BatmanObject);
     Batman.initializeObject(BatmanObject.prototype);
     BatmanObject.global = function(isGlobal) {
@@ -794,6 +890,36 @@
       return this.classMixin.apply(this.prototype, arguments);
     };
     BatmanObject.prototype.mixin = BatmanObject.classMixin;
+    counter = 0;
+    BatmanObject.prototype._objectID = function() {
+      var c;
+      this._objectID = function() {
+        return c;
+      };
+      return c = counter++;
+    };
+    BatmanObject.prototype.hashKey = function() {
+      var key;
+      if (typeof this.isEqual === 'function') {
+        return;
+      }
+      this.hashKey = function() {
+        return key;
+      };
+      return key = "<Batman.Object " + (this._objectID()) + ">";
+    };
+    BatmanObject.prototype.toJSON = function() {
+      var key, obj, value;
+      obj = {};
+      for (key in this) {
+        if (!__hasProp.call(this, key)) continue;
+        value = this[key];
+        if (key !== "_batman") {
+          obj[key] = value.toJSON ? value.toJSON() : value;
+        }
+      }
+      return obj;
+    };
     getAccessorObject = function(accessor) {
       if (!accessor.get && !accessor.set && !accessor.unset) {
         accessor = {
@@ -803,16 +929,16 @@
       return accessor;
     };
     BatmanObject.classAccessor = function() {
-      var accessor, key, keys, _base, _j, _k, _len2, _results;
-      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _j = arguments.length - 1) : (_j = 0, []), accessor = arguments[_j++];
+      var accessor, key, keys, _base, _i, _j, _len, _results;
+      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _i = arguments.length - 1) : (_i = 0, []), accessor = arguments[_i++];
       Batman.initializeObject(this);
       if (keys.length === 0) {
         return this._batman.defaultAccessor = getAccessorObject(accessor);
       } else {
         (_base = this._batman).keyAccessors || (_base.keyAccessors = new Batman.SimpleHash);
         _results = [];
-        for (_k = 0, _len2 = keys.length; _k < _len2; _k++) {
-          key = keys[_k];
+        for (_j = 0, _len = keys.length; _j < _len; _j++) {
+          key = keys[_j];
           _results.push(this._batman.keyAccessors.set(key, getAccessorObject(accessor)));
         }
         return _results;
@@ -853,6 +979,14 @@
       this.accessor.apply(this, arguments);
     }
     return Accessible;
+  })();
+  Batman.TerminalAccessible = (function() {
+    __extends(TerminalAccessible, Batman.Accessible);
+    function TerminalAccessible() {
+      TerminalAccessible.__super__.constructor.apply(this, arguments);
+    }
+    TerminalAccessible.prototype.propertyClass = Batman.Property;
+    return TerminalAccessible;
   })();
   Batman.Enumerable = {
     isEnumerable: true,
@@ -934,11 +1068,11 @@
     }
   };
   $extendsEnumerable = function(onto) {
-    var k, v, _ref2, _results;
-    _ref2 = Batman.Enumerable;
+    var k, v, _ref, _results;
+    _ref = Batman.Enumerable;
     _results = [];
-    for (k in _ref2) {
-      v = _ref2[k];
+    for (k in _ref) {
+      v = _ref[k];
       _results.push(onto[k] = v);
     }
     return _results;
@@ -951,10 +1085,10 @@
     $extendsEnumerable(SimpleHash.prototype);
     SimpleHash.prototype.propertyClass = Batman.Property;
     SimpleHash.prototype.hasKey = function(key) {
-      var pair, pairs, _j, _len2;
-      if (pairs = this._storage[key]) {
-        for (_j = 0, _len2 = pairs.length; _j < _len2; _j++) {
-          pair = pairs[_j];
+      var pair, pairs, _i, _len;
+      if (pairs = this._storage[this.hashKeyFor(key)]) {
+        for (_i = 0, _len = pairs.length; _i < _len; _i++) {
+          pair = pairs[_i];
           if (this.equality(pair[0], key)) {
             return true;
           }
@@ -963,10 +1097,10 @@
       return false;
     };
     SimpleHash.prototype.get = function(key) {
-      var pair, pairs, _j, _len2;
-      if (pairs = this._storage[key]) {
-        for (_j = 0, _len2 = pairs.length; _j < _len2; _j++) {
-          pair = pairs[_j];
+      var pair, pairs, _i, _len;
+      if (pairs = this._storage[this.hashKeyFor(key)]) {
+        for (_i = 0, _len = pairs.length; _i < _len; _i++) {
+          pair = pairs[_i];
           if (this.equality(pair[0], key)) {
             return pair[1];
           }
@@ -974,10 +1108,10 @@
       }
     };
     SimpleHash.prototype.set = function(key, val) {
-      var pair, pairs, _base, _j, _len2;
-      pairs = (_base = this._storage)[key] || (_base[key] = []);
-      for (_j = 0, _len2 = pairs.length; _j < _len2; _j++) {
-        pair = pairs[_j];
+      var pair, pairs, _base, _i, _len, _name;
+      pairs = (_base = this._storage)[_name = this.hashKeyFor(key)] || (_base[_name] = []);
+      for (_i = 0, _len = pairs.length; _i < _len; _i++) {
+        pair = pairs[_i];
         if (this.equality(pair[0], key)) {
           return pair[1] = val;
         }
@@ -987,19 +1121,22 @@
       return val;
     };
     SimpleHash.prototype.unset = function(key) {
-      var index, obj, pairs, value, _len2, _ref2;
-      if (pairs = this._storage[key]) {
-        for (index = 0, _len2 = pairs.length; index < _len2; index++) {
-          _ref2 = pairs[index], obj = _ref2[0], value = _ref2[1];
+      var index, obj, pair, pairs, value, _len, _ref;
+      if (pairs = this._storage[this.hashKeyFor(key)]) {
+        for (index = 0, _len = pairs.length; index < _len; index++) {
+          _ref = pairs[index], obj = _ref[0], value = _ref[1];
           if (this.equality(obj, key)) {
-            pairs.splice(index, 1);
+            pair = pairs.splice(index, 1);
             this.length--;
-            return;
+            return pair[0][1];
           }
         }
       }
     };
     SimpleHash.prototype.getOrSet = Batman.Observable.getOrSet;
+    SimpleHash.prototype.hashKeyFor = function(obj) {
+      return (obj != null ? typeof obj.hashKey === "function" ? obj.hashKey() : void 0 : void 0) || obj;
+    };
     SimpleHash.prototype.equality = function(lhs, rhs) {
       if (lhs === rhs) {
         return true;
@@ -1013,17 +1150,17 @@
       return false;
     };
     SimpleHash.prototype.forEach = function(iterator) {
-      var key, obj, value, values, _ref2, _results;
-      _ref2 = this._storage;
+      var key, obj, value, values, _ref, _results;
+      _ref = this._storage;
       _results = [];
-      for (key in _ref2) {
-        values = _ref2[key];
+      for (key in _ref) {
+        values = _ref[key];
         _results.push((function() {
-          var _j, _len2, _ref3, _ref4, _results2;
-          _ref3 = values.slice();
+          var _i, _len, _ref2, _ref3, _results2;
+          _ref2 = values.slice();
           _results2 = [];
-          for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
-            _ref4 = _ref3[_j], obj = _ref4[0], value = _ref4[1];
+          for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
+            _ref3 = _ref2[_i], obj = _ref3[0], value = _ref3[1];
             _results2.push(iterator(obj, value));
           }
           return _results2;
@@ -1034,8 +1171,8 @@
     SimpleHash.prototype.keys = function() {
       var result;
       result = [];
-      Batman.SimpleHash.prototype.forEach.call(this, function(obj) {
-        return result.push(obj);
+      Batman.SimpleHash.prototype.forEach.call(this, function(key) {
+        return result.push(key);
       });
       return result;
     };
@@ -1047,12 +1184,12 @@
       return this.length === 0;
     };
     SimpleHash.prototype.merge = function() {
-      var hash, merged, others, _j, _len2;
+      var hash, merged, others, _i, _len;
       others = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       merged = new this.constructor;
       others.unshift(this);
-      for (_j = 0, _len2 = others.length; _j < _len2; _j++) {
-        hash = others[_j];
+      for (_i = 0, _len = others.length; _i < _len; _i++) {
+        hash = others[_i];
         hash.forEach(function(obj, value) {
           return merged.set(obj, value);
         });
@@ -1062,7 +1199,7 @@
     return SimpleHash;
   })();
   Batman.Hash = (function() {
-    var k, proto, _fn2, _j, _len2, _ref2;
+    var k, proto, _fn, _i, _len, _ref;
     __extends(Hash, Batman.Object);
     function Hash() {
       var self;
@@ -1085,22 +1222,51 @@
     Hash.prototype.propertyClass = Batman.Property;
     Hash.accessor({
       get: Batman.SimpleHash.prototype.get,
-      set: Hash.mutation(Batman.SimpleHash.prototype.set),
-      unset: Hash.mutation(Batman.SimpleHash.prototype.unset)
+      set: Hash.mutation(function(key, value) {
+        var result;
+        result = Batman.SimpleHash.prototype.set.call(this, key, value);
+        this.fire('itemsWereAdded', key);
+        return result;
+      }),
+      unset: Hash.mutation(function(key) {
+        var result;
+        result = Batman.SimpleHash.prototype.unset.call(this, key);
+        if (result != null) {
+          this.fire('itemsWereRemoved', key);
+        }
+        return result;
+      })
     });
-    Hash.prototype.clear = Hash.mutation(Batman.SimpleHash.prototype.clear);
+    Hash.prototype.clear = Hash.mutation(function() {
+      var keys, result;
+      keys = this.meta.get('keys');
+      result = Batman.SimpleHash.prototype.clear.call(this);
+      this.fire.apply(this, ['itemsWereRemoved'].concat(__slice.call(keys)));
+      return result;
+    });
     Hash.prototype.equality = Batman.SimpleHash.prototype.equality;
-    _ref2 = ['hasKey', 'forEach', 'isEmpty', 'keys', 'merge'];
-    _fn2 = function(k) {
+    Hash.prototype.hashKeyFor = Batman.SimpleHash.prototype.hashKeyFor;
+    Hash.prototype.toJSON = function() {
+      var obj;
+      obj = {};
+      this.keys().forEach(__bind(function(key) {
+        var value;
+        value = this.get(key);
+        return obj[key] = value.toJSON ? value.toJSON() : value;
+      }, this));
+      return obj;
+    };
+    _ref = ['hasKey', 'forEach', 'isEmpty', 'keys', 'merge'];
+    _fn = function(k) {
       return proto[k] = function() {
         this.registerAsMutableSource();
         return Batman.SimpleHash.prototype[k].apply(this, arguments);
       };
     };
-    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-      k = _ref2[_j];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      k = _ref[_i];
       proto = Hash.prototype;
-      _fn2(k);
+      _fn(k);
     }
     return Hash;
   })();
@@ -1119,11 +1285,11 @@
       return this._storage.hasKey(item);
     };
     SimpleSet.prototype.add = function() {
-      var addedItems, item, items, _j, _len2;
+      var addedItems, item, items, _i, _len;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       addedItems = [];
-      for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-        item = items[_j];
+      for (_i = 0, _len = items.length; _i < _len; _i++) {
+        item = items[_i];
         if (!this._storage.hasKey(item)) {
           this._storage.set(item, true);
           addedItems.push(item);
@@ -1137,11 +1303,11 @@
       return addedItems;
     };
     SimpleSet.prototype.remove = function() {
-      var item, items, removedItems, _j, _len2;
+      var item, items, removedItems, _i, _len;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       removedItems = [];
-      for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-        item = items[_j];
+      for (_i = 0, _len = items.length; _i < _len; _i++) {
+        item = items[_i];
         if (this._storage.hasKey(item)) {
           this._storage.unset(item);
           removedItems.push(item);
@@ -1177,12 +1343,12 @@
       return this._storage.keys();
     };
     SimpleSet.prototype.merge = function() {
-      var merged, others, set, _j, _len2;
+      var merged, others, set, _i, _len;
       others = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       merged = new this.constructor;
       others.unshift(this);
-      for (_j = 0, _len2 = others.length; _j < _len2; _j++) {
-        set = others[_j];
+      for (_i = 0, _len = others.length; _i < _len; _i++) {
+        set = others[_i];
         set.forEach(function(v) {
           return merged.add(v);
         });
@@ -1192,48 +1358,62 @@
     SimpleSet.prototype.indexedBy = function(key) {
       return this._indexes.get(key) || this._indexes.set(key, new Batman.SetIndex(this, key));
     };
-    SimpleSet.prototype.sortedBy = function(key) {
-      return this._sorts.get(key) || this._sorts.set(key, new Batman.SetSort(this, key));
+    SimpleSet.prototype.sortedBy = function(key, order) {
+      var sortsForKey;
+      if (order == null) {
+        order = "asc";
+      }
+      order = order.toLowerCase() === "desc" ? "desc" : "asc";
+      sortsForKey = this._sorts.get(key) || this._sorts.set(key, new Batman.Object);
+      return sortsForKey.get(order) || sortsForKey.set(order, new Batman.SetSort(this, key, order));
     };
     return SimpleSet;
   })();
   Batman.Set = (function() {
-    var k, proto, _fn2, _j, _k, _len2, _len3, _ref2, _ref3;
+    var k, proto, _fn, _i, _j, _len, _len2, _ref, _ref2;
     __extends(Set, Batman.Object);
     function Set() {
       Batman.SimpleSet.apply(this, arguments);
     }
     $extendsEnumerable(Set.prototype);
-    _ref2 = ['add', 'remove', 'clear', 'indexedBy', 'sortedBy'];
-    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-      k = _ref2[_j];
+    _ref = ['add', 'remove', 'clear', 'indexedBy', 'sortedBy'];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      k = _ref[_i];
       Set.prototype[k] = Batman.SimpleSet.prototype[k];
     }
-    _ref3 = ['merge', 'forEach', 'toArray', 'isEmpty', 'has'];
-    _fn2 = function(k) {
+    _ref2 = ['merge', 'forEach', 'toArray', 'isEmpty', 'has'];
+    _fn = function(k) {
       return proto[k] = function() {
         this.registerAsMutableSource();
         return Batman.SimpleSet.prototype[k].apply(this, arguments);
       };
     };
-    for (_k = 0, _len3 = _ref3.length; _k < _len3; _k++) {
-      k = _ref3[_k];
+    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+      k = _ref2[_j];
       proto = Set.prototype;
-      _fn2(k);
+      _fn(k);
     }
     Set.prototype.toJSON = Set.prototype.toArray;
     Set.accessor('indexedBy', function() {
-      return new Batman.Accessible(__bind(function(key) {
+      return new Batman.TerminalAccessible(__bind(function(key) {
         return this.indexedBy(key);
       }, this));
     });
     Set.accessor('sortedBy', function() {
-      return new Batman.Accessible(__bind(function(key) {
+      return new Batman.TerminalAccessible(__bind(function(key) {
         return this.sortedBy(key);
+      }, this));
+    });
+    Set.accessor('sortedByDescending', function() {
+      return new Batman.TerminalAccessible(__bind(function(key) {
+        return this.sortedBy(key, 'desc');
       }, this));
     });
     Set.accessor('isEmpty', function() {
       return this.isEmpty();
+    });
+    Set.accessor('toArray', function() {
+      return this.toArray();
     });
     Set.accessor('length', function() {
       this.registerAsMutableSource();
@@ -1276,33 +1456,33 @@
       return this._manageSetObservers("removeHandler");
     };
     SetObserver.prototype.startObservingItems = function() {
-      var item, items, _j, _len2, _results;
+      var item, items, _i, _len, _results;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       _results = [];
-      for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-        item = items[_j];
+      for (_i = 0, _len = items.length; _i < _len; _i++) {
+        item = items[_i];
         _results.push(this._manageObserversForItem(item, "observe"));
       }
       return _results;
     };
     SetObserver.prototype.stopObservingItems = function() {
-      var item, items, _j, _len2, _results;
+      var item, items, _i, _len, _results;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       _results = [];
-      for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-        item = items[_j];
+      for (_i = 0, _len = items.length; _i < _len; _i++) {
+        item = items[_i];
         _results.push(this._manageObserversForItem(item, "forget"));
       }
       return _results;
     };
     SetObserver.prototype._manageObserversForItem = function(item, method) {
-      var key, _j, _len2, _ref2;
+      var key, _i, _len, _ref;
       if (!item.isObservable) {
         return;
       }
-      _ref2 = this.observedItemKeys;
-      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-        key = _ref2[_j];
+      _ref = this.observedItemKeys;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        key = _ref[_i];
         item[method](key, this._getOrSetObserverForItemAndKey(item, key));
       }
       if (method === "forget") {
@@ -1324,12 +1504,80 @@
     };
     return SetObserver;
   })();
+  Batman.SetProxy = (function() {
+    var k, _fn, _fn2, _fn3, _i, _j, _k, _len, _len2, _len3, _ref, _ref2, _ref3;
+    __extends(SetProxy, Batman.Object);
+    function SetProxy() {
+      SetProxy.__super__.constructor.call(this);
+      this.length = 0;
+    }
+    $extendsEnumerable(SetProxy.prototype);
+    SetProxy.prototype.filter = function(f) {
+      var r;
+      r = new Batman.Set();
+      return this.reduce((function(r, e) {
+        if (f(e)) {
+          r.add(e);
+        }
+        return r;
+      }), r);
+    };
+    _ref = ['add', 'remove', 'clear'];
+    _fn = __bind(function(k) {
+      return this.prototype[k] = function() {
+        var results, _ref2;
+        results = (_ref2 = this.base)[k].apply(_ref2, arguments);
+        this.length = this.set('length', this.base.get('length'));
+        return results;
+      };
+    }, SetProxy);
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      k = _ref[_i];
+      _fn(k);
+    }
+    _ref2 = ['has', 'merge', 'toArray', 'isEmpty'];
+    _fn2 = __bind(function(k) {
+      return this.prototype[k] = function() {
+        var _ref3;
+        return (_ref3 = this.base)[k].apply(_ref3, arguments);
+      };
+    }, SetProxy);
+    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+      k = _ref2[_j];
+      _fn2(k);
+    }
+    _ref3 = ['isEmpty', 'toArray'];
+    _fn3 = __bind(function(k) {
+      return this.accessor(k, function() {
+        return this.base.get(k);
+      });
+    }, SetProxy);
+    for (_k = 0, _len3 = _ref3.length; _k < _len3; _k++) {
+      k = _ref3[_k];
+      _fn3(k);
+    }
+    SetProxy.accessor('length', {
+      get: function() {
+        this.registerAsMutableSource();
+        return this.length;
+      },
+      set: function(k, v) {
+        return this.length = v;
+      }
+    });
+    return SetProxy;
+  }).call(this);
   Batman.SetSort = (function() {
-    __extends(SetSort, Batman.Object);
-    function SetSort(base, key) {
+    __extends(SetSort, Batman.SetProxy);
+    function SetSort(base, key, order) {
       var boundReIndex;
       this.base = base;
       this.key = key;
+      if (order == null) {
+        order = "asc";
+      }
+      SetSort.__super__.constructor.call(this);
+      this.descending = order.toLowerCase() === "desc";
       if (this.base.isObservable) {
         this._setObserver = new Batman.SetObserver(this.base);
         this._setObserver.observedItemKeys = [this.key];
@@ -1344,23 +1592,23 @@
       this._reIndex();
     }
     SetSort.prototype.startObserving = function() {
-      var _ref2;
-      return (_ref2 = this._setObserver) != null ? _ref2.startObserving() : void 0;
+      var _ref;
+      return (_ref = this._setObserver) != null ? _ref.startObserving() : void 0;
     };
     SetSort.prototype.stopObserving = function() {
-      var _ref2;
-      return (_ref2 = this._setObserver) != null ? _ref2.stopObserving() : void 0;
+      var _ref;
+      return (_ref = this._setObserver) != null ? _ref.stopObserving() : void 0;
     };
     SetSort.prototype.toArray = function() {
       return this.get('_storage');
     };
     SetSort.accessor('toArray', SetSort.prototype.toArray);
     SetSort.prototype.forEach = function(iterator) {
-      var e, i, _len2, _ref2, _results;
-      _ref2 = this.get('_storage');
+      var e, i, _len, _ref, _results;
+      _ref = this.get('_storage');
       _results = [];
-      for (i = 0, _len2 = _ref2.length; i < _len2; i++) {
-        e = _ref2[i];
+      for (i = 0, _len = _ref.length; i < _len; i++) {
+        e = _ref[i];
         _results.push(iterator(e, i));
       }
       return _results;
@@ -1404,21 +1652,22 @@
       return 0;
     };
     SetSort.prototype._reIndex = function() {
-      var newOrder, _ref2;
+      var newOrder, _ref;
       newOrder = this.base.toArray().sort(__bind(function(a, b) {
-        var valueA, valueB;
-        valueA = Batman.Observable.property.call(a, this.key).getValue();
+        var multiple, valueA, valueB;
+        valueA = $get(a, this.key);
         if (valueA != null) {
           valueA = valueA.valueOf();
         }
-        valueB = Batman.Observable.property.call(b, this.key).getValue();
+        valueB = $get(b, this.key);
         if (valueB != null) {
           valueB = valueB.valueOf();
         }
-        return this.compare.call(this, valueA, valueB);
+        multiple = this.descending ? -1 : 1;
+        return this.compare.call(this, valueA, valueB) * multiple;
       }, this));
-      if ((_ref2 = this._setObserver) != null) {
-        _ref2.startObservingItems.apply(_ref2, newOrder);
+      if ((_ref = this._setObserver) != null) {
+        _ref.startObservingItems.apply(_ref, newOrder);
       }
       return this.set('_storage', newOrder);
     };
@@ -1429,27 +1678,28 @@
     function SetIndex(base, key) {
       this.base = base;
       this.key = key;
+      SetIndex.__super__.constructor.call(this);
       this._storage = new Batman.Hash;
       if (this.base.isEventEmitter) {
         this._setObserver = new Batman.SetObserver(this.base);
         this._setObserver.observedItemKeys = [this.key];
         this._setObserver.observerForItemAndKey = this.observerForItemAndKey.bind(this);
         this._setObserver.on('itemsWereAdded', __bind(function() {
-          var item, items, _j, _len2, _results;
+          var item, items, _i, _len, _results;
           items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
           _results = [];
-          for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-            item = items[_j];
+          for (_i = 0, _len = items.length; _i < _len; _i++) {
+            item = items[_i];
             _results.push(this._addItem(item));
           }
           return _results;
         }, this));
         this._setObserver.on('itemsWereRemoved', __bind(function() {
-          var item, items, _j, _len2, _results;
+          var item, items, _i, _len, _results;
           items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
           _results = [];
-          for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-            item = items[_j];
+          for (_i = 0, _len = items.length; _i < _len; _i++) {
+            item = items[_i];
             _results.push(this._removeItem(item));
           }
           return _results;
@@ -1462,12 +1712,12 @@
       return this._resultSetForKey(key);
     });
     SetIndex.prototype.startObserving = function() {
-      var _ref2;
-      return (_ref2 = this._setObserver) != null ? _ref2.startObserving() : void 0;
+      var _ref;
+      return (_ref = this._setObserver) != null ? _ref.startObserving() : void 0;
     };
     SetIndex.prototype.stopObserving = function() {
-      var _ref2;
-      return (_ref2 = this._setObserver) != null ? _ref2.stopObserving() : void 0;
+      var _ref;
+      return (_ref = this._setObserver) != null ? _ref.stopObserving() : void 0;
     };
     SetIndex.prototype.observerForItemAndKey = function(item, key) {
       return __bind(function(newValue, oldValue) {
@@ -1524,188 +1774,86 @@
     };
     return UniqueSetIndex;
   })();
-  Batman.SortableSet = (function() {
-    var k, _fn2, _j, _len2, _ref2;
-    __extends(SortableSet, Batman.Set);
-    function SortableSet() {
-      SortableSet.__super__.constructor.apply(this, arguments);
-      this._sortIndexes = {};
-      this.observe('activeIndex', __bind(function() {
-        return this.setWasSorted();
-      }, this));
+  Batman.StateMachine = {
+    initialize: function() {
+      Batman.initializeObject(this);
+      if (!this._batman.states) {
+        return this._batman.states = new Batman.SimpleHash;
+      }
+    },
+    state: function(name, callback) {
+      Batman.StateMachine.initialize.call(this);
+      if (!name) {
+        return this._batman.getFirst('state');
+      }
+      developer.assert(this.isEventEmitter, "StateMachine requires EventEmitter");
+      this[name] || (this[name] = function(callback) {
+        return _stateMachine_setState.call(this, name);
+      });
+      if (typeof callback === 'function') {
+        return this.on(name, callback);
+      }
+    },
+    transition: function(from, to, callback) {
+      Batman.StateMachine.initialize.call(this);
+      this.state(from);
+      this.state(to);
+      if (callback) {
+        return this.on("" + from + "->" + to, callback);
+      }
     }
-    SortableSet.prototype.setWasSorted = function() {
-      if (this.length !== 0) {
-        return this.fire('setWasSorted');
-      }
-    };
-    _ref2 = ['add', 'remove', 'clear'];
-    _fn2 = __bind(function(k) {
-      return this.prototype[k] = function() {
-        var results;
-        results = Batman.Set.prototype[k].apply(this, arguments);
-        this._reIndex();
-        return results;
-      };
-    }, SortableSet);
-    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-      k = _ref2[_j];
-      _fn2(k);
+  };
+  Batman.Object.actsAsStateMachine = function(includeInstanceMethods) {
+    if (includeInstanceMethods == null) {
+      includeInstanceMethods = true;
     }
-    SortableSet.prototype.isSortableSet = true;
-    SortableSet.prototype.addIndex = function(index) {
-      return this._reIndex(index);
+    Batman.StateMachine.initialize.call(this);
+    Batman.StateMachine.initialize.call(this.prototype);
+    this.classState = function() {
+      return Batman.StateMachine.state.apply(this, arguments);
     };
-    SortableSet.prototype.removeIndex = function(index) {
-      this._sortIndexes[index] = null;
-      delete this._sortIndexes[index];
-      if (this.activeIndex === index) {
-        this.unset('activeIndex');
-      }
-      return index;
+    this.state = function() {
+      return this.classState.apply(this.prototype, arguments);
     };
-    SortableSet.prototype.forEach = function(iterator) {
-      var el, _k, _len3, _ref3, _results;
-      _ref3 = this.toArray();
-      _results = [];
-      for (_k = 0, _len3 = _ref3.length; _k < _len3; _k++) {
-        el = _ref3[_k];
-        _results.push(iterator(el));
-      }
-      return _results;
-    };
-    SortableSet.prototype.sortBy = function(index) {
-      if (!this._sortIndexes[index]) {
-        this.addIndex(index);
-      }
-      if (this.activeIndex !== index) {
-        this.set('activeIndex', index);
-      }
-      return this;
-    };
-    SortableSet.prototype.isSorted = function() {
-      return this._sortIndexes[this.get('activeIndex')] != null;
-    };
-    SortableSet.prototype.toArray = function() {
-      return this._sortIndexes[this.get('activeIndex')] || SortableSet.__super__.toArray.apply(this, arguments);
-    };
-    SortableSet.prototype._reIndex = function(index) {
-      var ary, keypath, ordering, _ref3;
-      if (index) {
-        _ref3 = index.split(' '), keypath = _ref3[0], ordering = _ref3[1];
-        ary = Batman.Set.prototype.toArray.call(this);
-        this._sortIndexes[index] = ary.sort(function(a, b) {
-          var valueA, valueB, _ref4, _ref5, _ref6;
-          valueA = (_ref4 = (Batman.Observable.property.call(a, keypath)).getValue()) != null ? _ref4.valueOf() : void 0;
-          valueB = (_ref5 = (Batman.Observable.property.call(b, keypath)).getValue()) != null ? _ref5.valueOf() : void 0;
-          if ((ordering != null ? ordering.toLowerCase() : void 0) === 'desc') {
-            _ref6 = [valueB, valueA], valueA = _ref6[0], valueB = _ref6[1];
-          }
-          if (valueA < valueB) {
-            return -1;
-          } else if (valueA > valueB) {
-            return 1;
-          } else {
-            return 0;
-          }
-        });
-        if (this.activeIndex === index) {
-          this.setWasSorted();
-        }
-      } else {
-        for (index in this._sortIndexes) {
-          this._reIndex(index);
-        }
-        this.setWasSorted();
-      }
-      return this;
-    };
-    return SortableSet;
-  }).call(this);
-  Batman.StateMachine = (function() {
-    __extends(StateMachine, Batman.Object);
-    StateMachine.InvalidTransitionError = function(message) {
-      this.message = message;
-    };
-    StateMachine.InvalidTransitionError.prototype = Error.prototype;
-    StateMachine.transitions = function(table) {
-      var k, transitions, _fn2, _ref2;
-      this.prototype.transitionTable = $mixin({}, this.prototype.transitionTable, table);
-      _ref2 = this.prototype.transitionTable;
-      _fn2 = __bind(function(k) {
-        return this.prototype[k] || (this.prototype[k] = function(suggestedNextState) {
-          return this["do"](k, suggestedNextState);
-        });
-      }, this);
-      for (k in _ref2) {
-        transitions = _ref2[k];
-        _fn2(k);
-      }
-      return this;
-    };
-    function StateMachine(startState) {
-      this.nextEvents = [];
-      this.set('_state', startState);
+    if (includeInstanceMethods) {
+      this.prototype.state = this.classState;
     }
-    StateMachine.accessor('state', function() {
-      return this.get('_state');
-    });
-    StateMachine.prototype.isTransitioning = false;
-    StateMachine.prototype.transitionTable = {};
-    StateMachine.prototype.onTransition = function(from, into, callback) {
-      return this.on("" + from + "->" + into, callback);
+    this.classTransition = function() {
+      return Batman.StateMachine.transition.apply(this, arguments);
     };
-    StateMachine.prototype.onEnter = function(into, callback) {
-      return this.on("enter:" + into, callback);
+    this.transition = function() {
+      return this.classTransition.apply(this.prototype, arguments);
     };
-    StateMachine.prototype.onExit = function(from, callback) {
-      return this.on("exit:" + from, callback);
-    };
-    StateMachine.prototype["do"] = function(event, suggestedNextState) {
-      var nextState, previousState;
-      if (this.isTransitioning) {
-        this.nextEvents.push(event);
-        return;
-      }
-      previousState = this.get('state');
-      nextState = this.nextStateOnEvent(event);
-      if (!nextState) {
-        return false;
-      }
-      if (nextState.unshift) {
-        developer.assert(~nextState.indexOf(suggestedNextState), "Warning, invalid transition for the multiple destination event " + event + "!");
-        nextState = suggestedNextState;
-      }
-      this.isTransitioning = true;
-      this.fire("exit:" + previousState);
-      this.fire("" + previousState + "->" + nextState);
-      this.set('_state', nextState);
-      this.fire("enter:" + nextState);
-      this.isTransitioning = false;
-      if (this.nextEvents.length > 0) {
-        this["do"](this.nextEvents.shift());
-      }
-      return true;
-    };
-    StateMachine.prototype.canDo = function(event, fromState) {
-      if (fromState == null) {
-        fromState = this.get('state');
-      }
-      return !!this.nextStateOnEvent(event, fromState);
-    };
-    StateMachine.prototype.nextStateOnEvent = function(event, fromState) {
-      var _ref2;
-      if (fromState == null) {
-        fromState = this.get('state');
-      }
-      return (_ref2 = this.transitionTable[event]) != null ? _ref2[fromState] : void 0;
-    };
-    return StateMachine;
-  })();
+    if (includeInstanceMethods) {
+      return this.prototype.transition = this.classTransition;
+    }
+  };
+  _stateMachine_setState = function(newState) {
+    var oldState, _base, _ref;
+    Batman.StateMachine.initialize.call(this);
+    if (this._batman.isTransitioning) {
+      ((_base = this._batman).nextState || (_base.nextState = [])).push(newState);
+      return false;
+    }
+    this._batman.isTransitioning = true;
+    oldState = this.state();
+    this._batman.state = newState;
+    if (newState && oldState) {
+      this.fire("" + oldState + "->" + newState, newState, oldState);
+    }
+    if (newState) {
+      this.fire(newState, newState, oldState);
+    }
+    this._batman.isTransitioning = false;
+    if ((_ref = this._batman.nextState) != null ? _ref.length : void 0) {
+      this[this._batman.nextState.shift()]();
+    }
+    return newState;
+  };
   Batman.Request = (function() {
     __extends(Request, Batman.Object);
     Request.objectToFormData = function(data) {
-      var formData, key, pairForList, val, _j, _len2, _ref2, _ref3;
+      var formData, key, pairForList, val, _i, _len, _ref, _ref2;
       pairForList = function(key, object, first) {
         var k, list, v;
         if (first == null) {
@@ -1736,9 +1884,9 @@
         })();
       };
       formData = new FormData();
-      _ref2 = pairForList("", data, true);
-      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-        _ref3 = _ref2[_j], key = _ref3[0], val = _ref3[1];
+      _ref = pairForList("", data, true);
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        _ref2 = _ref[_i], key = _ref2[0], val = _ref2[1];
         formData.append(key, val);
       }
       return formData;
@@ -1787,26 +1935,33 @@
       App.__super__.constructor.apply(this, arguments);
     }
     App.requirePath = '';
-    App.require = function() {
-      var base, name, names, path, _j, _len2;
-      path = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      base = this.requirePath + path;
-      for (_j = 0, _len2 = names.length; _j < _len2; _j++) {
-        name = names[_j];
-        this.prevent('run');
-        path = base + '/' + name + '.coffee';
-        new Batman.Request({
-          url: path,
-          type: 'html',
-          success: __bind(function(response) {
-            CoffeeScript.eval(response);
-            this.allow('run');
-            return this.run();
-          }, this)
-        });
-      }
-      return this;
-    };
+    developer["do"](function() {
+      return App.require = function() {
+        var base, name, names, path, _i, _len;
+        path = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+        base = this.requirePath + path;
+        for (_i = 0, _len = names.length; _i < _len; _i++) {
+          name = names[_i];
+          this.prevent('run');
+          path = base + '/' + name + '.coffee';
+          new Batman.Request({
+            url: path,
+            type: 'html',
+            success: __bind(function(response) {
+              CoffeeScript.eval(response);
+              this.allow('run');
+              if (!this.isPrevented('run')) {
+                this.fire('loaded');
+              }
+              if (this.wantsToRun) {
+                return this.run();
+              }
+            }, this)
+          });
+        }
+        return this;
+      };
+    });
     App.controller = function() {
       var names;
       names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -1833,6 +1988,12 @@
       if (this.hasRun) {
         return false;
       }
+      if (this.isPrevented('run')) {
+        this.wantsToRun = true;
+        return false;
+      } else {
+        delete this.wantsToRun;
+      }
       Batman.currentApp = this;
       if (typeof this.dispatcher === 'undefined') {
         this.dispatcher || (this.dispatcher = new Batman.Dispatcher(this));
@@ -1847,8 +2008,10 @@
         }, this));
       }
       if (typeof this.historyManager === 'undefined' && this.dispatcher.routeMap) {
-        this.historyManager = Batman.historyManager = new Batman.HashHistory(this);
-        this.historyManager.start();
+        this.on('run', __bind(function() {
+          this.historyManager = Batman.historyManager = new Batman.HashHistory(this);
+          return this.historyManager.start();
+        }, this));
       }
       this.hasRun = true;
       this.fire('run');
@@ -1857,9 +2020,9 @@
     App.event('ready').oneShot = true;
     App.event('stop').oneShot = true;
     App.stop = function() {
-      var _ref2;
-      if ((_ref2 = this.historyManager) != null) {
-        _ref2.stop();
+      var _ref;
+      if ((_ref = this.historyManager) != null) {
+        _ref.stop();
       }
       Batman.historyManager = null;
       this.hasRun = false;
@@ -1910,9 +2073,9 @@
       }
     });
     Route.prototype.parameterize = function(url) {
-      var action, array, index, key, param, params, query, s, value, _j, _len2, _len3, _ref2, _ref3, _ref4, _ref5;
-      _ref2 = url.split('?'), url = _ref2[0], query = _ref2[1];
-      array = (_ref3 = this.regexp.exec(url)) != null ? _ref3.slice(1) : void 0;
+      var action, array, index, key, param, params, query, s, value, _i, _len, _len2, _ref, _ref2, _ref3, _ref4;
+      _ref = url.split('?'), url = _ref[0], query = _ref[1];
+      array = (_ref2 = this.regexp.exec(url)) != null ? _ref2.slice(1) : void 0;
       params = {
         url: url
       };
@@ -1923,23 +2086,23 @@
         $mixin(params, action);
       }
       if (array) {
-        for (index = 0, _len2 = array.length; index < _len2; index++) {
+        for (index = 0, _len = array.length; index < _len; index++) {
           param = array[index];
           params[this.namedArguments[index]] = param;
         }
       }
       if (query) {
-        _ref4 = query.split('&');
-        for (_j = 0, _len3 = _ref4.length; _j < _len3; _j++) {
-          s = _ref4[_j];
-          _ref5 = s.split('='), key = _ref5[0], value = _ref5[1];
+        _ref3 = query.split('&');
+        for (_i = 0, _len2 = _ref3.length; _i < _len2; _i++) {
+          s = _ref3[_i];
+          _ref4 = s.split('='), key = _ref4[0], value = _ref4[1];
           params[key] = value;
         }
       }
       return params;
     };
     Route.prototype.dispatch = function(url) {
-      var action, params, _ref2, _ref3;
+      var action, params, _ref, _ref2;
       if ($typeOf(url) === 'String') {
         params = this.parameterize(url);
       }
@@ -1949,23 +2112,23 @@
       if (typeof action === 'function') {
         return action(params);
       }
-      if ((_ref2 = params.target) != null ? _ref2.dispatch : void 0) {
+      if ((_ref = params.target) != null ? _ref.dispatch : void 0) {
         return params.target.dispatch(action, params);
       }
-      return (_ref3 = params.target) != null ? _ref3[action](params) : void 0;
+      return (_ref2 = params.target) != null ? _ref2[action](params) : void 0;
     };
     return Route;
   })();
   Batman.Dispatcher = (function() {
     __extends(Dispatcher, Batman.Object);
     function Dispatcher(app) {
-      var controller, key, _ref2;
+      var controller, key, _ref;
       this.app = app;
       this.app.route(this);
       this.app.controllers = new Batman.Object;
-      _ref2 = this.app;
-      for (key in _ref2) {
-        controller = _ref2[key];
+      _ref = this.app;
+      for (key in _ref) {
+        controller = _ref[key];
         if (!((controller != null ? controller.prototype : void 0) instanceof Batman.Controller)) {
           continue;
         }
@@ -2002,26 +2165,26 @@
       return this.routeMap[url] = route;
     };
     Dispatcher.prototype.findRoute = function(url) {
-      var route, routeUrl, _ref2;
+      var route, routeUrl, _ref;
       if (url.indexOf('/') !== 0) {
         url = "/" + url;
       }
       if ((route = this.routeMap[url])) {
         return route;
       }
-      _ref2 = this.routeMap;
-      for (routeUrl in _ref2) {
-        route = _ref2[routeUrl];
+      _ref = this.routeMap;
+      for (routeUrl in _ref) {
+        route = _ref[routeUrl];
         if (route.regexp.test(url)) {
           return route;
         }
       }
     };
     Dispatcher.prototype.findUrl = function(params) {
-      var action, controller, key, matches, options, route, url, value, _ref2, _ref3;
-      _ref2 = this.routeMap;
-      for (url in _ref2) {
-        route = _ref2[url];
+      var action, controller, key, matches, options, route, url, value, _ref, _ref2;
+      _ref = this.routeMap;
+      for (url in _ref) {
+        route = _ref[url];
         matches = false;
         options = route.options;
         if (params.resource) {
@@ -2031,7 +2194,7 @@
           if (typeof action === 'function') {
             continue;
           }
-          _ref3 = action, controller = _ref3.controller, action = _ref3.action;
+          _ref2 = action, controller = _ref2.controller, action = _ref2.action;
           if (controller === params.controller && action === (params.action || 'index')) {
             matches = true;
           }
@@ -2054,7 +2217,8 @@
       } else if (url !== '/404') {
         $redirect('/404');
       }
-      return this.app.set('currentURL', url);
+      this.app.set('currentURL', url);
+      return this.app.set('currentRoute', route);
     };
     return Dispatcher;
   })();
@@ -2137,12 +2301,12 @@
     return HashHistory;
   })();
   Batman.redirect = $redirect = function(url) {
-    var _ref2;
-    return (_ref2 = Batman.historyManager) != null ? _ref2.redirect(url) : void 0;
+    var _ref;
+    return (_ref = Batman.historyManager) != null ? _ref.redirect(url) : void 0;
   };
   Batman.App.classMixin({
     route: function(url, signature, options) {
-      var dispatcher, key, value, _ref2;
+      var dispatcher, key, value, _ref;
       if (options == null) {
         options = {};
       }
@@ -2151,9 +2315,9 @@
       }
       if (url instanceof Batman.Dispatcher) {
         dispatcher = url;
-        _ref2 = this._dispatcherCache;
-        for (key in _ref2) {
-          value = _ref2[key];
+        _ref = this._dispatcherCache;
+        for (key in _ref) {
+          value = _ref[key];
           dispatcher.register(key, value);
         }
         this._dispatcherCache = null;
@@ -2267,22 +2431,22 @@
       }
     });
     Controller.prototype.dispatch = function(action, params) {
-      var filter, filters, oldRedirect, redirectTo, _j, _k, _len2, _len3, _ref2, _ref3, _ref4, _ref5, _ref6;
+      var filter, filters, oldRedirect, redirectTo, _i, _j, _len, _len2, _ref, _ref2, _ref3, _ref4, _ref5;
       if (params == null) {
         params = {};
       }
       params.controller || (params.controller = this.get('controllerName'));
       params.action || (params.action = action);
       params.target || (params.target = this);
-      oldRedirect = (_ref2 = Batman.historyManager) != null ? _ref2.redirect : void 0;
-      if ((_ref3 = Batman.historyManager) != null) {
-        _ref3.redirect = this.redirect;
+      oldRedirect = (_ref = Batman.historyManager) != null ? _ref.redirect : void 0;
+      if ((_ref2 = Batman.historyManager) != null) {
+        _ref2.redirect = this.redirect;
       }
       this._actedDuringAction = false;
       this.set('action', action);
-      if (filters = (_ref4 = this.constructor._batman) != null ? _ref4.get('beforeFilters') : void 0) {
-        for (_j = 0, _len2 = filters.length; _j < _len2; _j++) {
-          filter = filters[_j];
+      if (filters = (_ref3 = this.constructor._batman) != null ? _ref3.get('beforeFilters') : void 0) {
+        for (_i = 0, _len = filters.length; _i < _len; _i++) {
+          filter = filters[_i];
           if (typeof filter === 'function') {
             filter.call(this, params);
           } else {
@@ -2295,9 +2459,9 @@
       if (!this._actedDuringAction) {
         this.render();
       }
-      if (filters = (_ref5 = this.constructor._batman) != null ? _ref5.get('afterFilters') : void 0) {
-        for (_k = 0, _len3 = filters.length; _k < _len3; _k++) {
-          filter = filters[_k];
+      if (filters = (_ref4 = this.constructor._batman) != null ? _ref4.get('afterFilters') : void 0) {
+        for (_j = 0, _len2 = filters.length; _j < _len2; _j++) {
+          filter = filters[_j];
           if (typeof filter === 'function') {
             filter.call(this, params);
           } else {
@@ -2307,8 +2471,8 @@
       }
       delete this._actedDuringAction;
       this.set('action', null);
-      if ((_ref6 = Batman.historyManager) != null) {
-        _ref6.redirect = oldRedirect;
+      if ((_ref5 = Batman.historyManager) != null) {
+        _ref5.redirect = oldRedirect;
       }
       redirectTo = this._afterFilterRedirect;
       delete this._afterFilterRedirect;
@@ -2333,7 +2497,7 @@
       }
     };
     Controller.prototype.render = function(options) {
-      var view, _ref2;
+      var view, _ref;
       if (options == null) {
         options = {};
       }
@@ -2349,17 +2513,17 @@
         options.view = new Batman.View(options);
       }
       if (view = options.view) {
-        if ((_ref2 = Batman.currentApp) != null) {
-          _ref2.prevent('ready');
+        if ((_ref = Batman.currentApp) != null) {
+          _ref.prevent('ready');
         }
         view.contexts.push(this);
         view.on('ready', function() {
-          var _ref3, _ref4;
+          var _ref2, _ref3;
           Batman.DOM.replace('main', view.get('node'));
-          if ((_ref3 = Batman.currentApp) != null) {
-            _ref3.allow('ready');
+          if ((_ref2 = Batman.currentApp) != null) {
+            _ref2.allow('ready');
           }
-          return (_ref4 = Batman.currentApp) != null ? _ref4.fire('ready') : void 0;
+          return (_ref3 = Batman.currentApp) != null ? _ref3.fire('ready') : void 0;
         });
       }
       return view;
@@ -2367,6 +2531,7 @@
     return Controller;
   })();
   Batman.Model = (function() {
+    var k, _i, _j, _len, _len2, _ref, _ref2;
     __extends(Model, Batman.Object);
     Model.primaryKey = 'id';
     Model.storageKey = null;
@@ -2376,10 +2541,10 @@
       Batman.initializeObject(this.prototype);
       storage = (_base = this.prototype._batman).storage || (_base.storage = []);
       results = (function() {
-        var _j, _len2, _results;
+        var _i, _len, _results;
         _results = [];
-        for (_j = 0, _len2 = mechanisms.length; _j < _len2; _j++) {
-          mechanism = mechanisms[_j];
+        for (_i = 0, _len = mechanisms.length; _i < _len; _i++) {
+          mechanism = mechanisms[_i];
           mechanism = mechanism.isStorageAdapter ? mechanism : new mechanism(this);
           storage.push(mechanism);
           _results.push(mechanism);
@@ -2393,8 +2558,8 @@
       }
     };
     Model.encode = function() {
-      var decoder, encoder, encoderOrLastKey, key, keys, _base, _base2, _j, _k, _len2, _results;
-      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _j = arguments.length - 1) : (_j = 0, []), encoderOrLastKey = arguments[_j++];
+      var decoder, encoder, encoderOrLastKey, key, keys, _base, _base2, _i, _j, _len, _results;
+      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _i = arguments.length - 1) : (_i = 0, []), encoderOrLastKey = arguments[_i++];
       Batman.initializeObject(this.prototype);
       (_base = this.prototype._batman).encoders || (_base.encoders = new Batman.SimpleHash);
       (_base2 = this.prototype._batman).decoders || (_base2.decoders = new Batman.SimpleHash);
@@ -2416,8 +2581,8 @@
         decoder = this.defaultEncoder.decode;
       }
       _results = [];
-      for (_k = 0, _len2 = keys.length; _k < _len2; _k++) {
-        key = keys[_k];
+      for (_j = 0, _len = keys.length; _j < _len; _j++) {
+        key = keys[_j];
         if (encoder) {
           this.prototype._batman.encoders.set(key, encoder);
         }
@@ -2440,8 +2605,8 @@
       });
     });
     Model.validate = function() {
-      var keys, match, matches, options, optionsOrFunction, validator, validators, _base, _j, _k, _len2, _results;
-      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _j = arguments.length - 1) : (_j = 0, []), optionsOrFunction = arguments[_j++];
+      var keys, match, matches, options, optionsOrFunction, validator, validators, _base, _i, _j, _len, _results;
+      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _i = arguments.length - 1) : (_i = 0, []), optionsOrFunction = arguments[_i++];
       Batman.initializeObject(this.prototype);
       validators = (_base = this.prototype._batman).validators || (_base.validators = []);
       if (typeof optionsOrFunction === 'function') {
@@ -2452,13 +2617,13 @@
       } else {
         options = optionsOrFunction;
         _results = [];
-        for (_k = 0, _len2 = Validators.length; _k < _len2; _k++) {
-          validator = Validators[_k];
+        for (_j = 0, _len = Validators.length; _j < _len; _j++) {
+          validator = Validators[_j];
           _results.push((function() {
-            var _l, _len3;
+            var _k, _len2;
             if ((matches = validator.matches(options))) {
-              for (_l = 0, _len3 = matches.length; _l < _len3; _l++) {
-                match = matches[_l];
+              for (_k = 0, _len2 = matches.length; _k < _len2; _k++) {
+                match = matches[_k];
                 delete options[match];
               }
               return validators.push({
@@ -2471,35 +2636,10 @@
         return _results;
       }
     };
-    Model.LifecycleStateMachine = (function() {
-      __extends(LifecycleStateMachine, Batman.StateMachine);
-      function LifecycleStateMachine() {
-        LifecycleStateMachine.__super__.constructor.apply(this, arguments);
-      }
-      LifecycleStateMachine.transitions({
-        load: {
-          empty: 'loading',
-          loaded: 'loading',
-          loading: 'loading'
-        },
-        loaded: {
-          loading: 'loaded'
-        },
-        error: {
-          loading: 'error'
-        }
-      });
-      return LifecycleStateMachine;
-    })();
-    Model.classAccessor('lifecycle', function() {
-      var _base;
-      this._batman.check(this);
-      return (_base = this._batman).lifecycle || (_base.lifecycle = new Model.LifecycleStateMachine('empty'));
-    });
     Model.classAccessor('all', {
       get: function() {
-        var _ref2;
-        if (this.prototype.hasStorage() && ((_ref2 = this.get('lifecycle.state')) !== 'loaded' && _ref2 !== 'loading')) {
+        var _ref;
+        if (this.prototype.hasStorage() && ((_ref = this.classState()) !== 'loaded' && _ref !== 'loading')) {
           this.load();
         }
         return this.get('loaded');
@@ -2510,14 +2650,10 @@
     });
     Model.classAccessor('loaded', {
       get: function() {
-        if (!this.all) {
-          this.all = new Batman.SortableSet;
-          this.all.sortBy("id asc");
-        }
-        return this.all;
+        return this._loaded || (this._loaded = new Batman.Set);
       },
       set: function(k, v) {
-        return this.all = v;
+        return this._loaded = v;
       }
     });
     Model.classAccessor('first', function() {
@@ -2531,47 +2667,42 @@
     Model.find = function(id, callback) {
       var newRecord, record;
       developer.assert(callback, "Must call find with a callback!");
-      record = new this(id);
+      record = new this();
+      record.set('id', id);
       newRecord = this._mapIdentity(record);
       newRecord.load(callback);
       return newRecord;
     };
     Model.load = function(options, callback) {
-      var lifecycle;
       if ($typeOf(options) === 'Function') {
         callback = options;
         options = {};
       }
       developer.assert(this.prototype._batman.getAll('storage').length, "Can't load model " + ($functionName(this)) + " without any storage adapters!");
-      lifecycle = this.get('lifecycle');
-      if (lifecycle.load()) {
-        return this.prototype._doStorageOperation('readAll', options, __bind(function(err, records) {
-          var mappedRecords, record;
-          if (err != null) {
-            lifecycle.error();
-            return typeof callback === "function" ? callback(err, []) : void 0;
-          } else {
-            mappedRecords = (function() {
-              var _j, _len2, _results;
-              _results = [];
-              for (_j = 0, _len2 = records.length; _j < _len2; _j++) {
-                record = records[_j];
-                _results.push(this._mapIdentity(record));
-              }
-              return _results;
-            }).call(this);
-            lifecycle.loaded();
-            return typeof callback === "function" ? callback(err, mappedRecords) : void 0;
-          }
-        }, this));
-      } else {
-        return callback(new Batman.StateMachine.InvalidTransitionError("Can't load while in state " + (lifecycle.get('state'))));
-      }
+      this.loading();
+      return this.prototype._doStorageOperation('readAll', options, __bind(function(err, records) {
+        var mappedRecords, record;
+        if (err != null) {
+          return typeof callback === "function" ? callback(err, []) : void 0;
+        } else {
+          mappedRecords = (function() {
+            var _i, _len, _results;
+            _results = [];
+            for (_i = 0, _len = records.length; _i < _len; _i++) {
+              record = records[_i];
+              _results.push(this._mapIdentity(record));
+            }
+            return _results;
+          }).call(this);
+          this.loaded();
+          return typeof callback === "function" ? callback(err, mappedRecords) : void 0;
+        }
+      }, this));
     };
     Model.create = function(attrs, callback) {
-      var obj, _ref2;
+      var obj, _ref;
       if (!callback) {
-        _ref2 = [{}, attrs], attrs = _ref2[0], callback = _ref2[1];
+        _ref = [{}, attrs], attrs = _ref[0], callback = _ref[1];
       }
       obj = new this(attrs);
       obj.save(callback);
@@ -2589,11 +2720,11 @@
       }
     };
     Model._mapIdentity = function(record) {
-      var existing, id, _ref2;
+      var existing, id, _ref;
       if (typeof (id = record.get('id')) === 'undefined' || id === '') {
         return record;
       } else {
-        existing = (_ref2 = this.get("loaded.indexedBy.id").get(id)) != null ? _ref2.toArray()[0] : void 0;
+        existing = (_ref = this.get("loaded.indexedBy.id").get(id)) != null ? _ref.toArray()[0] : void 0;
         if (existing) {
           existing.updateAttributes(record._batman.attributes || {});
           return existing;
@@ -2614,10 +2745,12 @@
         }
       },
       set: function(k, v) {
-        var pk;
+        var intId, pk;
+        if (typeof v === "string" && !isNaN(intId = parseInt(v, 10))) {
+          v = intId;
+        }
         pk = this.constructor.get('primaryKey');
         if (pk === 'id') {
-          this._markDirtyAttribute(k, this.id);
           return this.id = v;
         } else {
           return this.set(pk, v);
@@ -2625,108 +2758,30 @@
       }
     });
     Model.accessor('dirtyKeys', 'errors', Batman.Property.defaultAccessor);
-    Model.accessor('batmanState', function() {
-      return this.lifecycle.get('state');
+    Model.accessor('batmanState', {
+      get: function() {
+        return this.state();
+      },
+      set: function(k, v) {
+        return this.state(v);
+      }
     });
     Model.accessor(Model.defaultAccessor = {
       get: function(k) {
         var _base;
         return ((_base = this._batman).attributes || (_base.attributes = {}))[k] || this[k];
       },
-      set: function(key, value) {
-        var oldValue, result, _base;
-        oldValue = this.get(key);
-        result = ((_base = this._batman).attributes || (_base.attributes = {}))[key] = value;
-        this._markDirtyAttribute(key, oldValue);
-        return result;
+      set: function(k, v) {
+        var _base;
+        return ((_base = this._batman).attributes || (_base.attributes = {}))[k] = v;
       },
-      unset: function(key) {
-        var oldValue, _base;
-        oldValue = ((_base = this._batman).attributes || (_base.attributes = {}))[key];
-        delete this._batman.attributes[key];
-        this._markDirtyAttribute(key, oldValue);
-        return oldValue;
+      unset: function(k) {
+        var x, _base;
+        x = ((_base = this._batman).attributes || (_base.attributes = {}))[k];
+        delete this._batman.attributes[k];
+        return x;
       }
     });
-    Model.InstanceLifecycleStateMachine = (function() {
-      __extends(InstanceLifecycleStateMachine, Batman.StateMachine);
-      function InstanceLifecycleStateMachine() {
-        InstanceLifecycleStateMachine.__super__.constructor.apply(this, arguments);
-      }
-      InstanceLifecycleStateMachine.transitions({
-        load: {
-          empty: 'loading',
-          dirty: 'loading',
-          loaded: 'loading',
-          loading: 'loading'
-        },
-        loaded: {
-          loading: 'loaded'
-        },
-        keySet: {
-          empty: 'dirty',
-          loaded: 'dirty',
-          dirty: 'dirty',
-          validated: 'dirty'
-        },
-        clean: {
-          dirty: 'loaded',
-          loaded: 'loaded'
-        },
-        validate: {
-          dirty: 'validating',
-          loaded: 'validating',
-          empty: 'validating',
-          validated: 'validating'
-        },
-        validated: {
-          validating: 'validated'
-        },
-        invalidate: {
-          validating: ['dirty', 'loaded', 'empty']
-        },
-        doneValidation: {
-          validated: ['dirty', 'loaded', 'empty']
-        },
-        save: {
-          validated: 'saving',
-          empty: 'saving',
-          loaded: 'saving',
-          dirty: 'saving'
-        },
-        saved: {
-          saving: 'saved'
-        },
-        create: {
-          validated: 'creating',
-          empty: 'creating',
-          loaded: 'creating',
-          dirty: 'creating'
-        },
-        created: {
-          creating: 'created'
-        },
-        doneStore: {
-          created: 'loaded',
-          saved: 'loaded'
-        },
-        destroy: {
-          loaded: 'destroying',
-          dirty: 'destroying'
-        },
-        destroyed: {
-          destroying: 'destroyed'
-        },
-        error: {
-          loading: 'error',
-          validating: 'error',
-          destroying: 'error',
-          saving: 'error',
-          creating: 'error'
-        }
-      });
-      return InstanceLifecycleStateMachine;
-    })();
     function Model(idOrAttributes) {
       if (idOrAttributes == null) {
         idOrAttributes = {};
@@ -2737,14 +2792,29 @@
       developer.assert(this instanceof Batman.Object, "constructors must be called with new");
       this.dirtyKeys = new Batman.Hash;
       this.errors = new Batman.ErrorsSet;
-      this.lifecycle = new Batman.Model.InstanceLifecycleStateMachine('empty');
       if ($typeOf(idOrAttributes) === 'Object') {
         Model.__super__.constructor.call(this, idOrAttributes);
       } else {
         Model.__super__.constructor.call(this);
         this.set('id', idOrAttributes);
       }
+      if (!this.state()) {
+        this.empty();
+      }
     }
+    Model.prototype.set = function(key, value) {
+      var oldValue, result, _ref;
+      oldValue = this.get(key);
+      if (oldValue === value) {
+        return;
+      }
+      result = Model.__super__.set.apply(this, arguments);
+      this.dirtyKeys.set(key, oldValue);
+      if ((_ref = this.state()) !== 'dirty' && _ref !== 'loading' && _ref !== 'creating') {
+        this.dirty();
+      }
+      return result;
+    };
     Model.prototype.updateAttributes = function(attrs) {
       this.mixin(attrs);
       return this;
@@ -2788,12 +2858,23 @@
       }
       return this.mixin(obj);
     };
+    Model.actsAsStateMachine(true);
+    _ref = ['empty', 'dirty', 'loading', 'loaded', 'saving', 'saved', 'creating', 'created', 'validating', 'validated', 'destroying', 'destroyed'];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      k = _ref[_i];
+      Model.state(k);
+    }
+    _ref2 = ['loading', 'loaded'];
+    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+      k = _ref2[_j];
+      Model.classState(k);
+    }
     Model.prototype._doStorageOperation = function(operation, options, callback) {
-      var mechanism, mechanisms, _j, _len2;
+      var mechanism, mechanisms, _k, _len3;
       developer.assert(this.hasStorage(), "Can't " + operation + " model " + ($functionName(this.constructor)) + " without any storage adapters!");
       mechanisms = this._batman.get('storage');
-      for (_j = 0, _len2 = mechanisms.length; _j < _len2; _j++) {
-        mechanism = mechanisms[_j];
+      for (_k = 0, _len3 = mechanisms.length; _k < _len3; _k++) {
+        mechanism = mechanisms[_k];
         mechanism[operation](this, options, callback);
       }
       return true;
@@ -2802,136 +2883,106 @@
       return (this._batman.get('storage') || []).length > 0;
     };
     Model.prototype.load = function(callback) {
-      var _ref2;
-      if ((_ref2 = this.lifecycle.get('state')) === 'destroying' || _ref2 === 'destroyed') {
+      var _ref3;
+      if ((_ref3 = this.state()) === 'destroying' || _ref3 === 'destroyed') {
         if (typeof callback === "function") {
           callback(new Error("Can't load a destroyed record!"));
         }
         return;
       }
-      if (this.lifecycle.load()) {
-        return this._doStorageOperation('read', {}, __bind(function(err, record) {
-          if (!err) {
-            this.lifecycle.loaded();
-            record = this.constructor._mapIdentity(record);
-          } else {
-            this.lifecycle.error();
-          }
-          return typeof callback === "function" ? callback(err, record) : void 0;
-        }, this));
-      } else {
-        return typeof callback === "function" ? callback(new Batman.StateMachine.InvalidTransitionError("Can't load while in state " + (this.lifecycle.get('state')))) : void 0;
-      }
+      this.loading();
+      return this._doStorageOperation('read', {}, __bind(function(err, record) {
+        if (!err) {
+          this.loaded();
+          record = this.constructor._mapIdentity(record);
+        }
+        return typeof callback === "function" ? callback(err, record) : void 0;
+      }, this));
     };
     Model.prototype.save = function(callback) {
-      var _ref2;
-      if ((_ref2 = this.lifecycle.get('state')) === 'destroying' || _ref2 === 'destroyed') {
+      var _ref3;
+      if ((_ref3 = this.state()) === 'destroying' || _ref3 === 'destroyed') {
         if (typeof callback === "function") {
           callback(new Error("Can't save a destroyed record!"));
         }
         return;
       }
-      return this.validate(__bind(function(error, errors) {
+      return this.validate(__bind(function(isValid, errors) {
         var creating;
-        if (error || errors.length) {
+        if (!isValid) {
           if (typeof callback === "function") {
-            callback(error || errors);
+            callback(errors);
           }
           return;
         }
         creating = this.isNew();
-        if (this.lifecycle["do"](creating ? 'create' : 'save')) {
-          return this._doStorageOperation((creating ? 'create' : 'update'), {}, __bind(function(err, record) {
-            if (!err) {
-              this.lifecycle["do"](creating ? 'created' : 'saved');
-              this.dirtyKeys.clear();
-              record = this.constructor._mapIdentity(record);
-            } else {
-              this.lifecycle.error();
-            }
-            this.lifecycle.doneStore();
-            return typeof callback === "function" ? callback(err, record) : void 0;
-          }, this));
-        } else {
-          return typeof callback === "function" ? callback(new Batman.StateMachine.InvalidTransitionError("Can't save while in state " + (this.lifecycle.get('state')))) : void 0;
+        this.saving();
+        if (creating) {
+          this.creating();
         }
+        return this._doStorageOperation((creating ? 'create' : 'update'), {}, __bind(function(err, record) {
+          if (!err) {
+            if (creating) {
+              this.created();
+            }
+            this.saved();
+            this.dirtyKeys.clear();
+            record = this.constructor._mapIdentity(record);
+          }
+          return typeof callback === "function" ? callback(err, record) : void 0;
+        }, this));
       }, this));
     };
     Model.prototype.destroy = function(callback) {
-      if (this.lifecycle.destroy()) {
-        return this._doStorageOperation('destroy', {}, __bind(function(err, record) {
-          if (!err) {
-            this.constructor.get('all').remove(this);
-            this.lifecycle.destroyed();
-          } else {
-            this.lifecycle.error();
-          }
-          return typeof callback === "function" ? callback(err) : void 0;
-        }, this));
-      } else {
-        return typeof callback === "function" ? callback(new Batman.StateMachine.InvalidTransitionError("Can't destroy while in state " + (this.lifecycle.get('state')))) : void 0;
-      }
+      this.destroying();
+      return this._doStorageOperation('destroy', {}, __bind(function(err, record) {
+        if (!err) {
+          this.constructor.get('all').remove(this);
+          this.destroyed();
+        }
+        return typeof callback === "function" ? callback(err) : void 0;
+      }, this));
     };
     Model.prototype.validate = function(callback) {
-      var count, finish, key, oldState, v, validationCallback, validator, validators, _j, _k, _len2, _len3, _ref2;
-      oldState = this.lifecycle.get('state');
+      var count, finish, key, oldState, v, validationCallback, validator, validators, _k, _l, _len3, _len4, _ref3;
+      oldState = this.state();
       this.errors.clear();
-      if (this.lifecycle.validate()) {
-        finish = __bind(function() {
-          if (this.errors.get('length') === 0) {
-            this.lifecycle.validated();
-            this.lifecycle.doneValidation(oldState);
-            return typeof callback === "function" ? callback(void 0, this.errors) : void 0;
-          } else {
-            this.lifecycle.invalidate(oldState);
-            return typeof callback === "function" ? callback(void 0, this.errors) : void 0;
+      this.validating();
+      finish = __bind(function() {
+        this.validated();
+        this[oldState]();
+        return typeof callback === "function" ? callback(this.errors.length === 0, this.errors) : void 0;
+      }, this);
+      validators = this._batman.get('validators') || [];
+      if (!(validators.length > 0)) {
+        finish();
+      } else {
+        count = validators.length;
+        validationCallback = __bind(function() {
+          if (--count === 0) {
+            return finish();
           }
         }, this);
-        validators = this._batman.get('validators') || [];
-        if (!(validators.length > 0)) {
-          finish();
-        } else {
-          count = validators.length;
-          validationCallback = __bind(function() {
-            if (--count === 0) {
-              return finish();
-            }
-          }, this);
-          for (_j = 0, _len2 = validators.length; _j < _len2; _j++) {
-            validator = validators[_j];
-            v = validator.validator;
-            _ref2 = validator.keys;
-            for (_k = 0, _len3 = _ref2.length; _k < _len3; _k++) {
-              key = _ref2[_k];
-              if (v) {
-                v.validateEach(this.errors, this, key, validationCallback);
-              } else {
-                validator.callback(this.errors, this, key, validationCallback);
-              }
+        for (_k = 0, _len3 = validators.length; _k < _len3; _k++) {
+          validator = validators[_k];
+          v = validator.validator;
+          _ref3 = validator.keys;
+          for (_l = 0, _len4 = _ref3.length; _l < _len4; _l++) {
+            key = _ref3[_l];
+            if (v) {
+              v.validateEach(this.errors, this, key, validationCallback);
+            } else {
+              validator.callback(this.errors, this, key, validationCallback);
             }
           }
-        }
-      } else {
-        if (typeof callback === "function") {
-          callback(new Batman.StateMachine.InvalidTransitionError("Can't validate while in state " + (this.lifecycle.get('state'))));
         }
       }
     };
     Model.prototype.isNew = function() {
       return typeof this.get('id') === 'undefined';
     };
-    Model.prototype._markDirtyAttribute = function(key, oldValue) {
-      var _ref2;
-      if ((_ref2 = this.lifecycle.get('state')) !== 'loading' && _ref2 !== 'creating') {
-        if (this.lifecycle.keySet()) {
-          return this.dirtyKeys.set(key, oldValue);
-        } else {
-          throw new Batman.StateMachine.InvalidTransitionError("Can't set while in state " + (this.lifecycle.get('state')));
-        }
-      }
-    };
     return Model;
-  }).call(this);
+  })();
   Batman.ValidationError = (function() {
     __extends(ValidationError, Batman.Object);
     function ValidationError(attribute, message) {
@@ -2966,6 +3017,12 @@
     Validator.prototype.validate = function(record) {
       return developer.error("You must override validate in Batman.Validator subclasses.");
     };
+    Validator.prototype.format = function(key, messageKey, interpolations) {
+      return t('errors.format', {
+        attribute: key,
+        message: t("errors.messages." + messageKey, interpolations)
+      });
+    };
     Validator.options = function() {
       var options;
       options = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -2977,12 +3034,12 @@
       }
     };
     Validator.matches = function(options) {
-      var key, results, shouldReturn, value, _ref2, _ref3;
+      var key, results, shouldReturn, value, _ref, _ref2;
       results = {};
       shouldReturn = false;
       for (key in options) {
         value = options[key];
-        if (~((_ref2 = this._batman) != null ? (_ref3 = _ref2.options) != null ? _ref3.indexOf(key) : void 0 : void 0)) {
+        if (~((_ref = this._batman) != null ? (_ref2 = _ref.options) != null ? _ref2.indexOf(key) : void 0 : void 0)) {
           results[key] = value;
           shouldReturn = true;
         }
@@ -3012,13 +3069,19 @@
         options = this.options;
         value = record.get(key);
         if (options.minLength && value.length < options.minLength) {
-          errors.add(key, "" + key + " must be at least " + options.minLength + " characters");
+          errors.add(key, this.format(key, 'too_short', {
+            count: options.minLength
+          }));
         }
         if (options.maxLength && value.length > options.maxLength) {
-          errors.add(key, "" + key + " must be less than " + options.maxLength + " characters");
+          errors.add(key, this.format(key, 'too_long', {
+            count: options.maxLength
+          }));
         }
         if (options.length && value.length !== options.length) {
-          errors.add(key, "" + key + " must be " + options.length + " characters");
+          errors.add(key, this.format(key, 'wrong_length', {
+            count: options.length
+          }));
         }
         return callback();
       };
@@ -3033,15 +3096,26 @@
         var value;
         value = record.get(key);
         if (this.options.presence && !(value != null)) {
-          errors.add(key, "" + key + " must be present");
+          errors.add(key, this.format(key, 'blank'));
         }
         return callback();
       };
       return PresenceValidator;
     })()
   ];
+  $mixin(Batman.translate.messages, {
+    errors: {
+      format: "%{attribute} %{message}",
+      messages: {
+        too_short: "must be at least %{count} characters",
+        too_long: "must be less than %{count} characters",
+        wrong_length: "must be %{count} characters",
+        blank: "can't be blank"
+      }
+    }
+  });
   Batman.StorageAdapter = (function() {
-    var k, time, _fn2, _j, _k, _len2, _len3, _ref2, _ref3;
+    var k, time, _fn, _i, _j, _len, _len2, _ref, _ref2;
     __extends(StorageAdapter, Batman.Object);
     function StorageAdapter(model) {
       StorageAdapter.__super__.constructor.call(this, {
@@ -3051,11 +3125,11 @@
     }
     StorageAdapter.prototype.isStorageAdapter = true;
     StorageAdapter.prototype._batman.check(StorageAdapter.prototype);
-    _ref2 = ['all', 'create', 'read', 'readAll', 'update', 'destroy'];
-    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-      k = _ref2[_j];
-      _ref3 = ['before', 'after'];
-      _fn2 = __bind(function(k, time) {
+    _ref = ['all', 'create', 'read', 'readAll', 'update', 'destroy'];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      k = _ref[_i];
+      _ref2 = ['before', 'after'];
+      _fn = __bind(function(k, time) {
         var key;
         key = "" + time + (helpers.capitalize(k));
         return this.prototype[key] = function(filter) {
@@ -3064,27 +3138,27 @@
           return ((_base = this._batman)[_name = "" + key + "Filters"] || (_base[_name] = [])).push(filter);
         };
       }, StorageAdapter);
-      for (_k = 0, _len3 = _ref3.length; _k < _len3; _k++) {
-        time = _ref3[_k];
-        _fn2(k, time);
+      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+        time = _ref2[_j];
+        _fn(k, time);
       }
     }
     StorageAdapter.prototype.before = function() {
-      var callback, k, keys, _l, _len4, _m, _results;
-      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _l = arguments.length - 1) : (_l = 0, []), callback = arguments[_l++];
+      var callback, k, keys, _k, _l, _len3, _results;
+      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _k = arguments.length - 1) : (_k = 0, []), callback = arguments[_k++];
       _results = [];
-      for (_m = 0, _len4 = keys.length; _m < _len4; _m++) {
-        k = keys[_m];
+      for (_l = 0, _len3 = keys.length; _l < _len3; _l++) {
+        k = keys[_l];
         _results.push(this["before" + (helpers.capitalize(k))](callback));
       }
       return _results;
     };
     StorageAdapter.prototype.after = function() {
-      var callback, k, keys, _l, _len4, _m, _results;
-      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _l = arguments.length - 1) : (_l = 0, []), callback = arguments[_l++];
+      var callback, k, keys, _k, _l, _len3, _results;
+      keys = 2 <= arguments.length ? __slice.call(arguments, 0, _k = arguments.length - 1) : (_k = 0, []), callback = arguments[_k++];
       _results = [];
-      for (_m = 0, _len4 = keys.length; _m < _len4; _m++) {
-        k = keys[_m];
+      for (_l = 0, _len3 = keys.length; _l < _len3; _l++) {
+        k = keys[_l];
         _results.push(this["after" + (helpers.capitalize(k))](callback));
       }
       return _results;
@@ -3146,9 +3220,9 @@
       return [record.fromJSON(JSON.parse(attributes)), attributes, options];
     }));
     LocalStorage.prototype._forAllRecords = function(f) {
-      var i, _ref2, _results;
+      var i, k, _ref, _results;
       _results = [];
-      for (i = 0, _ref2 = this.storage.length; 0 <= _ref2 ? i < _ref2 : i > _ref2; 0 <= _ref2 ? i++ : i--) {
+      for (i = 0, _ref = this.storage.length; 0 <= _ref ? i < _ref : i > _ref; 0 <= _ref ? i++ : i--) {
         k = this.storage.key(i);
         _results.push(f.call(this, k, this.storage.getItem(k)));
       }
@@ -3161,8 +3235,8 @@
       return record;
     };
     LocalStorage.prototype.update = function(record, options, callback) {
-      var err, id, recordToSave, _ref2;
-      _ref2 = this._filterData('before', 'update', void 0, record, options), err = _ref2[0], recordToSave = _ref2[1];
+      var err, id, recordToSave, _ref;
+      _ref = this._filterData('before', 'update', void 0, record, options), err = _ref[0], recordToSave = _ref[1];
       if (!err) {
         id = record.get('id');
         if (id != null) {
@@ -3174,8 +3248,8 @@
       return callback.apply(null, this._filterData('after', 'update', err, record, options));
     };
     LocalStorage.prototype.create = function(record, options, callback) {
-      var err, id, key, recordToSave, _ref2;
-      _ref2 = this._filterData('before', 'create', void 0, record, options), err = _ref2[0], recordToSave = _ref2[1];
+      var err, id, key, recordToSave, _ref;
+      _ref = this._filterData('before', 'create', void 0, record, options), err = _ref[0], recordToSave = _ref[1];
       if (!err) {
         id = record.get('id') || record.set('id', this.nextId++);
         if (id != null) {
@@ -3192,8 +3266,8 @@
       return callback.apply(null, this._filterData('after', 'create', err, record, options));
     };
     LocalStorage.prototype.read = function(record, options, callback) {
-      var attrs, err, id, _ref2;
-      _ref2 = this._filterData('before', 'read', void 0, record, options), err = _ref2[0], record = _ref2[1];
+      var attrs, err, id, _ref;
+      _ref = this._filterData('before', 'read', void 0, record, options), err = _ref[0], record = _ref[1];
       id = record.get('id');
       if (!err) {
         if (id != null) {
@@ -3208,9 +3282,9 @@
       return callback.apply(null, this._filterData('after', 'read', err, record, attrs, options));
     };
     LocalStorage.prototype.readAll = function(_, options, callback) {
-      var err, records, _ref2;
+      var err, records, _ref;
       records = [];
-      _ref2 = this._filterData('before', 'readAll', void 0, options), err = _ref2[0], options = _ref2[1];
+      _ref = this._filterData('before', 'readAll', void 0, options), err = _ref[0], options = _ref[1];
       if (!err) {
         this._forAllRecords(function(storageKey, data) {
           var keyMatches;
@@ -3228,10 +3302,10 @@
       var allAttributes, attributes, data, options;
       allAttributes = _arg[0], options = _arg[1];
       allAttributes = (function() {
-        var _j, _len2, _name, _results;
+        var _i, _len, _name, _results;
         _results = [];
-        for (_j = 0, _len2 = allAttributes.length; _j < _len2; _j++) {
-          attributes = allAttributes[_j];
+        for (_i = 0, _len = allAttributes.length; _i < _len; _i++) {
+          attributes = allAttributes[_i];
           data = JSON.parse(attributes.data);
           data[_name = this.model.primaryKey] || (data[_name] = parseInt(attributes.id, 10));
           _results.push(data);
@@ -3241,11 +3315,11 @@
       return [allAttributes, options];
     }));
     LocalStorage.prototype.after('readAll', $passError(function(_arg) {
-      var allAttributes, data, k, match, matches, options, v, _j, _len2;
+      var allAttributes, data, k, match, matches, options, v, _i, _len;
       allAttributes = _arg[0], options = _arg[1];
       matches = [];
-      for (_j = 0, _len2 = allAttributes.length; _j < _len2; _j++) {
-        data = allAttributes[_j];
+      for (_i = 0, _len = allAttributes.length; _i < _len; _i++) {
+        data = allAttributes[_i];
         match = true;
         for (k in options) {
           v = options[k];
@@ -3265,10 +3339,10 @@
       filteredAttributes = _arg[0], options = _arg[1];
       return [
         (function() {
-          var _j, _len2, _results;
+          var _i, _len, _results;
           _results = [];
-          for (_j = 0, _len2 = filteredAttributes.length; _j < _len2; _j++) {
-            data = filteredAttributes[_j];
+          for (_i = 0, _len = filteredAttributes.length; _i < _len; _i++) {
+            data = filteredAttributes[_i];
             _results.push(this.getRecordFromData(data));
           }
           return _results;
@@ -3276,8 +3350,8 @@
       ];
     }));
     LocalStorage.prototype.destroy = function(record, options, callback) {
-      var err, id, key, _ref2;
-      _ref2 = this._filterData('before', 'destroy', void 0, record, options), err = _ref2[0], record = _ref2[1];
+      var err, id, key, _ref;
+      _ref = this._filterData('before', 'destroy', void 0, record, options), err = _ref[0], record = _ref[1];
       if (!err) {
         id = record.get('id');
         if (id != null) {
@@ -3302,6 +3376,7 @@
     };
     RestStorage.prototype.recordJsonNamespace = false;
     RestStorage.prototype.collectionJsonNamespace = false;
+    RestStorage.prototype.serializeAsForm = true;
     function RestStorage() {
       RestStorage.__super__.constructor.apply(this, arguments);
       this.recordJsonNamespace = helpers.singularize(this.modelKey);
@@ -3312,6 +3387,9 @@
       record = _arg[0], options = _arg[1];
       json = record.toJSON();
       record = this.recordJsonNamespace ? (x = {}, x[this.recordJsonNamespace] = json, x) : json;
+      if (!this.serializeAsForm) {
+        record = JSON.stringify(record);
+      }
       return [record, options];
     }));
     RestStorage.prototype.after('create', 'read', 'update', $passError(function(_arg) {
@@ -3329,11 +3407,11 @@
       return [record, data, options];
     }));
     RestStorage.prototype.optionsForRecord = function(record, idRequired, callback) {
-      var id, url;
+      var id, url, _base;
       if (record.url) {
-        url = typeof record.url === 'function' ? record.url() : record.url;
+        url = (typeof record.url === "function" ? record.url(record) : void 0) || record.url;
       } else {
-        url = "/" + this.modelKey;
+        url = (typeof (_base = this.model).url === "function" ? _base.url() : void 0) || this.model.url || ("/" + this.modelKey);
         if (idRequired || !record.isNew()) {
           id = record.get('id');
           if (!(id != null)) {
@@ -3365,8 +3443,8 @@
     };
     RestStorage.prototype.create = function(record, recordOptions, callback) {
       return this.optionsForRecord(record, false, function(err, options) {
-        var data, _ref2;
-        _ref2 = this._filterData('before', 'create', err, record, recordOptions), err = _ref2[0], data = _ref2[1];
+        var data, _ref;
+        _ref = this._filterData('before', 'create', err, record, recordOptions), err = _ref[0], data = _ref[1];
         if (err) {
           callback(err);
           return;
@@ -3385,8 +3463,8 @@
     };
     RestStorage.prototype.update = function(record, recordOptions, callback) {
       return this.optionsForRecord(record, true, function(err, options) {
-        var data, _ref2;
-        _ref2 = this._filterData('before', 'update', err, record, recordOptions), err = _ref2[0], data = _ref2[1];
+        var data, _ref;
+        _ref = this._filterData('before', 'update', err, record, recordOptions), err = _ref[0], data = _ref[1];
         if (err) {
           callback(err);
           return;
@@ -3405,8 +3483,8 @@
     };
     RestStorage.prototype.read = function(record, recordOptions, callback) {
       return this.optionsForRecord(record, true, function(err, options) {
-        var _ref2;
-        _ref2 = this._filterData('before', 'read', err, record, recordOptions), err = _ref2[0], record = _ref2[1], recordOptions = _ref2[2];
+        var _ref;
+        _ref = this._filterData('before', 'read', err, record, recordOptions), err = _ref[0], record = _ref[1], recordOptions = _ref[2];
         if (err) {
           callback(err);
           return;
@@ -3425,8 +3503,8 @@
     };
     RestStorage.prototype.readAll = function(_, recordsOptions, callback) {
       return this.optionsForCollection(recordsOptions, function(err, options) {
-        var _ref2;
-        _ref2 = this._filterData('before', 'readAll', err, recordsOptions), err = _ref2[0], recordsOptions = _ref2[1];
+        var _ref;
+        _ref = this._filterData('before', 'readAll', err, recordsOptions), err = _ref[0], recordsOptions = _ref[1];
         if (err) {
           callback(err);
           return;
@@ -3458,10 +3536,10 @@
       recordData = _arg[0], serverData = _arg[1], options = _arg[2];
       return [
         (function() {
-          var _j, _len2, _results;
+          var _i, _len, _results;
           _results = [];
-          for (_j = 0, _len2 = recordData.length; _j < _len2; _j++) {
-            attributes = recordData[_j];
+          for (_i = 0, _len = recordData.length; _i < _len; _i++) {
+            attributes = recordData[_i];
             _results.push(this.getRecordFromData(attributes));
           }
           return _results;
@@ -3470,8 +3548,8 @@
     }));
     RestStorage.prototype.destroy = function(record, recordOptions, callback) {
       return this.optionsForRecord(record, true, function(err, options) {
-        var _ref2;
-        _ref2 = this._filterData('before', 'destroy', err, record, recordOptions), err = _ref2[0], record = _ref2[1], recordOptions = _ref2[2];
+        var _ref;
+        _ref = this._filterData('before', 'destroy', err, record, recordOptions), err = _ref[0], record = _ref[1], recordOptions = _ref[2];
         if (err) {
           callback(err);
           return;
@@ -3537,7 +3615,7 @@
     View.observeAll('html', function(html) {
       var node;
       node = this.node || document.createElement('div');
-      node.innerHTML = html;
+      $setInnerHTML(node, html);
       if (this.node !== node) {
         return this.set('node', node);
       }
@@ -3558,7 +3636,7 @@
             this.contentFor = Batman.DOM._yields[yieldTo];
           }
           if (this.contentFor && node) {
-            this.contentFor.innerHTML = '';
+            $setInnerHTML(this.contentFor, '');
             return this.contentFor.appendChild(node);
           } else if (yieldTo) {
             if (contents = Batman.DOM._yieldContents[yieldTo]) {
@@ -3576,9 +3654,10 @@
     return View;
   })();
   Batman.Renderer = (function() {
-    var bindingRegexp, sortBindings;
+    var bindingRegexp, k, sortBindings, _i, _len, _ref;
     __extends(Renderer, Batman.Object);
     function Renderer(node, callback, contexts) {
+      var _ref;
       this.node = node;
       if (contexts == null) {
         contexts = [];
@@ -3589,8 +3668,8 @@
       if (callback != null) {
         this.on('parsed', callback);
       }
-      this.context = contexts instanceof RenderContext ? contexts : RenderContext.start.apply(RenderContext, contexts);
-      setTimeout(this.start, 0);
+      this.context = contexts instanceof Batman.RenderContext ? contexts : (_ref = Batman.RenderContext).start.apply(_ref, contexts);
+      this.timeout = setTimeout(this.start, 0);
     }
     Renderer.prototype.start = function() {
       this.startTime = new Date;
@@ -3605,10 +3684,17 @@
       this.fire('parsed');
       return this.fire('rendered');
     };
+    Renderer.prototype.stop = function() {
+      clearTimeout(this.timeout);
+      return this.fire('stopped');
+    };
     Renderer.prototype.forgetAll = function() {};
-    Renderer.prototype.event('parsed').oneShot = true;
-    Renderer.prototype.event('rendered').oneShot = true;
-    bindingRegexp = /data\-(.*)/;
+    _ref = ['parsed', 'rendered', 'stopped'];
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      k = _ref[_i];
+      Renderer.prototype.event(k).oneShot = true;
+    }
+    bindingRegexp = /^data\-(.*)/;
     sortBindings = function(a, b) {
       if (a[0] === 'foreach') {
         return -1;
@@ -3630,7 +3716,7 @@
       var attr, bindings, key, name, nextNode, readerArgs, result, skipChildren, varIndex, _base, _base2, _j, _len2, _name, _name2, _ref2;
       if (new Date - this.startTime > 50) {
         this.resumeNode = node;
-        setTimeout(this.resume, 0);
+        this.timeout = setTimeout(this.resume, 0);
         return;
       }
       if (node.getAttribute && node.attributes) {
@@ -3656,7 +3742,7 @@
           if (result === false) {
             skipChildren = true;
             break;
-          } else if (result instanceof RenderContext) {
+          } else if (result instanceof Batman.RenderContext) {
             this.context = result;
           }
         }
@@ -3702,19 +3788,22 @@
     return Renderer;
   })();
   Binding = (function() {
-    var get_dot_rx, get_rx, keypath_rx;
+    var deProxy, get_dot_rx, get_rx, keypath_rx;
     __extends(Binding, Batman.Object);
     keypath_rx = /(^|,)\s*(?!(?:true|false)\s*(?:$|,))([a-zA-Z][\w\.]*)\s*($|,)/g;
     get_dot_rx = /(?:\]\.)(.+?)(?=[\[\.]|\s*\||$)/;
     get_rx = /(?!^\s*)\[(.*?)\]/g;
-    Binding.accessor('filteredValue', function() {
-      var ctx, result, unfilteredValue;
-      unfilteredValue = this.get('unfilteredValue');
-      if (this.get('key')) {
-        ctx = this.get('keyContext');
+    deProxy = function(object) {
+      if (object instanceof Batman.RenderContext.ContextProxy) {
+        return object.get('proxiedObject');
+      } else {
+        return object;
       }
+    };
+    Binding.accessor('filteredValue', function() {
+      var result, unfilteredValue;
+      unfilteredValue = this.get('unfilteredValue');
       if (this.filterFunctions.length > 0) {
-        developer.currentFilterContext = ctx;
         developer.currentFilterStack = this.renderContext;
         result = this.filterFunctions.reduce(__bind(function(value, fn, i) {
           var args;
@@ -3726,16 +3815,17 @@
             }
           });
           args.unshift(value);
-          return fn.apply(ctx, args);
+          args = args.map(deProxy);
+          return fn.apply(this.renderContext, args);
         }, this), unfilteredValue);
-        developer.currentFilterContext = null;
         developer.currentFilterStack = null;
         return result;
       } else {
-        return unfilteredValue;
+        return deProxy(unfilteredValue);
       }
     });
     Binding.accessor('unfilteredValue', function() {
+      var k;
       if (k = this.get('key')) {
         return this.get("keyContext." + k);
       } else {
@@ -3746,9 +3836,16 @@
       return this.renderContext.findKey(this.key)[1];
     });
     function Binding() {
-      var shouldSet, _ref2, _ref3;
+      var bindings, shouldSet, _ref, _ref2;
       Binding.__super__.constructor.apply(this, arguments);
       this.parseFilter();
+      if (this.node) {
+        if (bindings = Batman.data(this.node, 'bindings')) {
+          bindings.add(this);
+        } else {
+          Batman.data(this.node, 'bindings', new Batman.Set(this));
+        }
+      }
       this.nodeChange || (this.nodeChange = __bind(function(node, context) {
         if (this.key && this.filterFunctions.length === 0) {
           return this.get('keyContext').set(this.key, this.node.value);
@@ -3758,14 +3855,14 @@
         return Batman.DOM.valueForNode(this.node, value);
       });
       shouldSet = true;
-      if (((_ref2 = this.only) === false || _ref2 === 'nodeChange') && Batman.DOM.nodeIsEditable(this.node)) {
+      if (((_ref = this.only) === false || _ref === 'nodeChange') && Batman.DOM.nodeIsEditable(this.node)) {
         Batman.DOM.events.change(this.node, __bind(function() {
           shouldSet = false;
           this.nodeChange(this.node, this.get('keyContext') || this.value, this);
           return shouldSet = true;
         }, this));
       }
-      if ((_ref3 = this.only) === false || _ref3 === 'dataChange') {
+      if ((_ref2 = this.only) === false || _ref2 === 'dataChange') {
         this.observeAndFire('filteredValue', __bind(function(value) {
           if (shouldSet) {
             return this.dataChange(value, this.node, this);
@@ -3820,9 +3917,9 @@
         }
         return this.filterArguments = this.filterArguments.map(__bind(function(argumentList) {
           return argumentList.map(__bind(function(argument) {
-            var _, _ref2;
+            var _, _ref;
             if (argument._keypath) {
-              _ref2 = this.renderContext.findKey(argument._keypath), _ = _ref2[0], argument.context = _ref2[1];
+              _ref = this.renderContext.findKey(argument._keypath), _ = _ref[0], argument.context = _ref[1];
             }
             return argument;
           }, this));
@@ -3834,14 +3931,14 @@
     };
     return Binding;
   })();
-  RenderContext = (function() {
+  Batman.RenderContext = (function() {
     var ContextProxy;
     RenderContext.start = function() {
       var context, contexts, node;
       contexts = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       node = new this(window);
       if (Batman.currentApp) {
-        contexts.unshift(Batman.currentApp);
+        contexts.push(Batman.currentApp);
       }
       while (context = contexts.pop()) {
         node = node.descend(context);
@@ -3880,8 +3977,8 @@
     };
     RenderContext.prototype.descendWithKey = function(key, scopedKey) {
       var proxy;
-      proxy = new ContextProxy(this, key, scopedKey);
-      return new this.constructor(proxy, this);
+      proxy = new ContextProxy(this, key);
+      return this.descend(proxy, scopedKey);
     };
     RenderContext.prototype.bind = function(node, key, dataChange, nodeChange, only) {
       if (only == null) {
@@ -3912,6 +4009,17 @@
       ContextProxy.accessor('proxiedObject', function() {
         return this.binding.get('filteredValue');
       });
+      ContextProxy.accessor({
+        get: function(key) {
+          return this.get("proxiedObject." + key);
+        },
+        set: function(key, value) {
+          return this.set("proxiedObject." + key, value);
+        },
+        unset: function(key) {
+          return this.unset("proxiedObject." + key);
+        }
+      });
       function ContextProxy(renderContext, keyPath, localKey) {
         this.renderContext = renderContext;
         this.keyPath = keyPath;
@@ -3921,15 +4029,6 @@
           keyPath: this.keyPath,
           only: 'neither'
         });
-        if (this.localKey) {
-          this.accessor(this.localKey, function() {
-            return this.get('proxiedObject');
-          });
-        } else {
-          this.accessor(function(key) {
-            return this.get("proxiedObject." + key);
-          });
-        }
       }
       return ContextProxy;
     })();
@@ -3946,20 +4045,20 @@
         return true;
       },
       bind: function(node, key, context, renderer, only) {
-        var _ref2, _ref3, _ref4;
+        var _ref, _ref2, _ref3;
         switch (node.nodeName.toLowerCase()) {
           case 'input':
             switch (node.getAttribute('type')) {
               case 'checkbox':
                 return Batman.DOM.attrReaders.bind(node, 'checked', key, context, renderer, only);
               case 'radio':
-                return (_ref2 = Batman.DOM.binders).radio.apply(_ref2, arguments);
+                return (_ref = Batman.DOM.binders).radio.apply(_ref, arguments);
               case 'file':
-                return (_ref3 = Batman.DOM.binders).file.apply(_ref3, arguments);
+                return (_ref2 = Batman.DOM.binders).file.apply(_ref2, arguments);
             }
             break;
           case 'select':
-            return (_ref4 = Batman.DOM.binders).select.apply(_ref4, arguments);
+            return (_ref3 = Batman.DOM.binders).select.apply(_ref3, arguments);
         }
         context.bind(node, key, void 0, void 0, only);
         return true;
@@ -3977,14 +4076,15 @@
         var originalDisplay;
         originalDisplay = node.style.display || '';
         context.bind(node, key, function(value) {
-          var hide, _ref2;
+          var hide, _ref;
           if (!!value === !invert) {
-            if ((_ref2 = Batman.data(node, 'show')) != null) {
-              _ref2.call(node);
+            if ((_ref = Batman.data(node, 'show')) != null) {
+              _ref.call(node);
             }
             return node.style.display = originalDisplay;
           } else {
-            if (typeof (hide = Batman.data(node, 'hide')) === 'function') {
+            hide = Batman.data(node, 'hide');
+            if (typeof hide === 'function') {
               return hide.call(node);
             } else {
               return node.style.display = 'none';
@@ -3994,21 +4094,29 @@
         return true;
       },
       hideif: function() {
-        var args, _ref2;
+        var args, _ref;
         args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        (_ref2 = Batman.DOM.readers).showif.apply(_ref2, __slice.call(args).concat([true]));
+        (_ref = Batman.DOM.readers).showif.apply(_ref, __slice.call(args).concat([true]));
         return true;
       },
       route: function(node, key, context) {
-        var action, app, container, dispatcher, model, name, url, _ref2, _ref3, _ref4;
+        var action, app, container, dispatcher, isHash, model, name, url, _ref, _ref2, _ref3;
         if (key.substr(0, 1) === '/') {
           url = key;
         } else {
-          _ref2 = key.split('/'), key = _ref2[0], action = _ref2[1];
-          _ref3 = context.findKey('dispatcher'), dispatcher = _ref3[0], app = _ref3[1];
-          _ref4 = context.findKey(key), model = _ref4[0], container = _ref4[1];
+          isHash = key.indexOf('#') > 1;
+          _ref = isHash ? key.split('#') : key.split('/'), key = _ref[0], action = _ref[1];
+          _ref2 = context.findKey('dispatcher'), dispatcher = _ref2[0], app = _ref2[1];
+          if (!isHash) {
+            _ref3 = context.findKey(key), model = _ref3[0], container = _ref3[1];
+          }
           dispatcher || (dispatcher = Batman.currentApp.dispatcher);
-          if (dispatcher && model instanceof Batman.Model) {
+          if (isHash) {
+            url = dispatcher.findUrl({
+              controller: key,
+              action: action
+            });
+          } else if (model instanceof Batman.Model) {
             action || (action = 'show');
             name = helpers.underscore(helpers.pluralize($functionName(model.constructor)));
             url = dispatcher.findUrl({
@@ -4104,7 +4212,6 @@
             });
             break;
           case 'value':
-          case 'style':
           case 'href':
           case 'src':
           case 'size':
@@ -4123,6 +4230,8 @@
               return subContext.set(key, node.className);
             };
             break;
+          case 'style':
+            return Batman.DOM.binders.style(node, attr, key, context, renderer, only);
           default:
             dataChange = function(value) {
               return node.setAttribute(attr, value);
@@ -4158,11 +4267,11 @@
         }, function() {});
         confirmText = node.getAttribute('data-confirm');
         Batman.DOM.events[eventName](node, function() {
-          var _ref2;
+          var _ref;
           if (confirmText && !confirm(confirmText)) {
             return;
           }
-          return (_ref2 = props.callback) != null ? _ref2.apply(props.subContext, arguments) : void 0;
+          return (_ref = props.callback) != null ? _ref.apply(props.subContext, arguments) : void 0;
         });
         return true;
       },
@@ -4185,143 +4294,16 @@
         return true;
       },
       removeclass: function() {
-        var args, _ref2;
+        var args, _ref;
         args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        return (_ref2 = Batman.DOM.attrReaders).addclass.apply(_ref2, __slice.call(args).concat([true]));
+        return (_ref = Batman.DOM.attrReaders).addclass.apply(_ref, __slice.call(args).concat([true]));
       },
       foreach: function(node, iteratorName, key, context, parentRenderer) {
-        var fragment, nodeMap, numPendingChildren, observers, oldCollection, parent, prototype, sibling;
-        prototype = node.cloneNode(true);
-        prototype.removeAttribute("data-foreach-" + iteratorName);
-        parent = node.parentNode;
-        sibling = node.nextSibling;
-        parentRenderer.on('parsed', function() {
-          return parent.removeChild(node);
-        });
-        nodeMap = new Batman.SimpleHash;
-        fragment = document.createDocumentFragment();
-        numPendingChildren = 0;
-        observers = {};
-        oldCollection = false;
-        context.bind(node, key, function(collection) {
-          var array, k, v, _results;
-          if (oldCollection) {
-            if (collection === oldCollection) {
-              return;
-            }
-            nodeMap.forEach(function(item, node) {
-              var _ref2;
-              return (_ref2 = node.parentNode) != null ? _ref2.removeChild(node) : void 0;
-            });
-            nodeMap.clear();
-            if (oldCollection.isEventEmitter) {
-              oldCollection.event('itemsWereAdded').removeHandler(observers.add);
-              oldCollection.event('itemsWereRemoved').removeHandler(observers.remove);
-              oldCollection.event('setWasSorted').removeHandler(observers.reorder);
-            }
-          }
-          oldCollection = collection;
-          observers.add = function() {
-            var childRenderer, item, items, newNode, _j, _len2, _results;
-            items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-            numPendingChildren += items.length;
-            _results = [];
-            for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-              item = items[_j];
-              parentRenderer.prevent('rendered');
-              newNode = prototype.cloneNode(true);
-              nodeMap.set(item, newNode);
-              childRenderer = new Batman.Renderer(newNode, (function(newNode) {
-                return function() {
-                  var show;
-                  if (typeof (show = Batman.data(newNode, 'show')) === 'function') {
-                    show.call(newNode, {
-                      before: sibling
-                    });
-                  } else {
-                    fragment.appendChild(newNode);
-                  }
-                  if (--numPendingChildren === 0) {
-                    parent.insertBefore(fragment, sibling);
-                    if (typeof collection.isSorted === "function" ? collection.isSorted() : void 0) {
-                      observers.reorder();
-                    }
-                    return fragment = document.createDocumentFragment();
-                  }
-                };
-              })(newNode), context.descend(item, iteratorName));
-              _results.push(childRenderer.on('rendered', __bind(function() {
-                parentRenderer.allow('rendered');
-                return parentRenderer.fire('rendered');
-              }, this)));
-            }
-            return _results;
-          };
-          observers.remove = function() {
-            var item, items, oldNode, _j, _len2, _ref2;
-            items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-            for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-              item = items[_j];
-              oldNode = nodeMap.get(item);
-              nodeMap.unset(item);
-              if ((oldNode != null) && typeof oldNode.hide === 'function') {
-                oldNode.hide(true);
-              } else {
-                if (oldNode != null) {
-                  if ((_ref2 = oldNode.parentNode) != null) {
-                    _ref2.removeChild(oldNode);
-                  }
-                }
-              }
-            }
-            return true;
-          };
-          observers.reorder = function() {
-            var item, items, show, thisNode, _j, _len2, _results;
-            items = collection.toArray();
-            _results = [];
-            for (_j = 0, _len2 = items.length; _j < _len2; _j++) {
-              item = items[_j];
-              thisNode = nodeMap.get(item);
-              show = Batman.data(thisNode, 'show');
-              _results.push(typeof show === 'function' ? show.call(thisNode, {
-                before: sibling
-              }) : parent.insertBefore(thisNode, sibling));
-            }
-            return _results;
-          };
-          observers.arrayChange = function(array) {
-            observers.remove.apply(observers, array);
-            return observers.add.apply(observers, array);
-          };
-          if (collection) {
-            if (collection.isEventEmitter) {
-              collection.on('itemsWereAdded', observers.add);
-              collection.on('itemsWereRemoved', observers.remove);
-              if (collection.isSortableSet) {
-                collection.on('setWasSorted', observers.reorder);
-              } else if (collection.isObservable) {
-                collection.observe('toArray', observers.arrayChange);
-              }
-            }
-            if (collection.forEach) {
-              return collection.forEach(function(item) {
-                return observers.add(item);
-              });
-            } else if (collection.get && (array = collection.get('toArray'))) {
-              return observers.add.apply(observers, array);
-            } else {
-              _results = [];
-              for (k in collection) {
-                v = collection[k];
-                _results.push(observers.add(k));
-              }
-              return _results;
-            }
-          } else {
-            return developer.warn("Warning! data-foreach-" + iteratorName + " called with an undefined binding. Key was: " + key + ".");
-          }
-        }, function() {});
+        (function(func, args, ctor) {
+          ctor.prototype = func.prototype;
+          var child = new ctor, result = func.apply(child, args);
+          return typeof result === "object" ? result : child;
+        })(Batman.DOM.Iterator, arguments, function() {});
         return false;
       },
       formfor: function(node, localName, key, context) {
@@ -4333,16 +4315,16 @@
     },
     binders: {
       select: function(node, key, context, renderer, only) {
-        var boundValue, container, updateOptionBindings, updateSelectBinding, _ref2;
-        _ref2 = context.findKey(key), boundValue = _ref2[0], container = _ref2[1];
+        var boundValue, container, updateOptionBindings, updateSelectBinding, _ref;
+        _ref = context.findKey(key), boundValue = _ref[0], container = _ref[1];
         updateSelectBinding = __bind(function() {
           var c, selections;
           selections = node.multiple ? (function() {
-            var _j, _len2, _ref3, _results;
-            _ref3 = node.children;
+            var _i, _len, _ref2, _results;
+            _ref2 = node.children;
             _results = [];
-            for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
-              c = _ref3[_j];
+            for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
+              c = _ref2[_i];
               if (c.selected) {
                 _results.push(c.value);
               }
@@ -4355,24 +4337,24 @@
           return container.set(key, selections);
         }, this);
         updateOptionBindings = __bind(function() {
-          var child, data, subBoundValue, subContainer, subContext, subKey, _j, _len2, _ref3, _ref4, _results;
-          _ref3 = node.children;
+          var child, data, subBoundValue, subContainer, subContext, subKey, _i, _len, _ref2, _ref3, _results;
+          _ref2 = node.children;
           _results = [];
-          for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
-            child = _ref3[_j];
-            _results.push((data = Batman.data(child, 'selected')) ? (subContext = data.context) && (subKey = data.key) ? ((_ref4 = subContext.findKey(subKey), subBoundValue = _ref4[0], subContainer = _ref4[1], _ref4), child.selected !== subBoundValue ? subContainer.set(subKey, child.selected) : void 0) : void 0 : void 0);
+          for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
+            child = _ref2[_i];
+            _results.push((data = Batman.data(child, 'selected')) ? (subContext = data.context) && (subKey = data.key) ? ((_ref3 = subContext.findKey(subKey), subBoundValue = _ref3[0], subContainer = _ref3[1], _ref3), child.selected !== subBoundValue ? subContainer.set(subKey, child.selected) : void 0) : void 0 : void 0);
           }
           return _results;
         }, this);
         renderer.on('rendered', function() {
           var dataChange, nodeChange;
           dataChange = function(newValue) {
-            var child, match, matches, value, valueToChild, _j, _k, _l, _len2, _len3, _len4, _ref3, _ref4;
+            var child, match, matches, value, valueToChild, _i, _j, _k, _len, _len2, _len3, _ref2, _ref3;
             if (newValue instanceof Array) {
               valueToChild = {};
-              _ref3 = node.children;
-              for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
-                child = _ref3[_j];
+              _ref2 = node.children;
+              for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
+                child = _ref2[_i];
                 child.selected = false;
                 matches = valueToChild[child.value];
                 if (matches) {
@@ -4382,11 +4364,11 @@
                 }
                 valueToChild[child.value] = matches;
               }
-              for (_k = 0, _len3 = newValue.length; _k < _len3; _k++) {
-                value = newValue[_k];
-                _ref4 = valueToChild[value];
-                for (_l = 0, _len4 = _ref4.length; _l < _len4; _l++) {
-                  match = _ref4[_l];
+              for (_j = 0, _len2 = newValue.length; _j < _len2; _j++) {
+                value = newValue[_j];
+                _ref3 = valueToChild[value];
+                for (_k = 0, _len3 = _ref3.length; _k < _len3; _k++) {
+                  match = _ref3[_k];
                   match.selected = true;
                 }
               }
@@ -4404,11 +4386,15 @@
         });
         return true;
       },
+      style: function(node, attr, key, context, renderer, only) {
+        new Batman.DOM.Style(node, key, context);
+        return true;
+      },
       radio: function(node, key, context, renderer, only) {
         var dataChange, nodeChange;
         dataChange = function(value) {
-          var boundValue, container, _ref2;
-          _ref2 = context.findKey(key), boundValue = _ref2[0], container = _ref2[1];
+          var boundValue, container, _ref;
+          _ref = context.findKey(key), boundValue = _ref[0], container = _ref[1];
           if (boundValue) {
             return node.checked = boundValue === node.value;
           } else if (node.checked) {
@@ -4425,16 +4411,16 @@
         context.bind(node, key, function() {
           return developer.warn("Can't write to file inputs! Tried to on key " + key + ".");
         }, function(node, subContext) {
-          var actualObject, adapter, _j, _len2, _ref2;
-          if (subContext instanceof RenderContext.ContextProxy) {
+          var actualObject, adapter, _i, _len, _ref;
+          if (subContext instanceof Batman.RenderContext.ContextProxy) {
             actualObject = subContext.get('proxiedObject');
           } else {
             actualObject = subContext;
           }
           if (actualObject.hasStorage && actualObject.hasStorage()) {
-            _ref2 = actualObject._batman.get('storage');
-            for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-              adapter = _ref2[_j];
+            _ref = actualObject._batman.get('storage');
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              adapter = _ref[_i];
               if (adapter instanceof Batman.RestStorage) {
                 adapter.defaultOptions.formData = true;
               }
@@ -4469,7 +4455,7 @@
         return Batman.DOM.events.click(node, callback, 'dblclick');
       },
       change: function(node, callback) {
-        var eventName, eventNames, oldCallback, _j, _len2, _results;
+        var eventName, eventNames, oldCallback, _i, _len, _results;
         eventNames = (function() {
           switch (node.nodeName.toUpperCase()) {
             case 'TEXTAREA':
@@ -4478,8 +4464,8 @@
               if (node.type.toUpperCase() === 'TEXT') {
                 oldCallback = callback;
                 callback = function(e) {
-                  var _ref2;
-                  if (e.type === 'keyup' && (13 <= (_ref2 = e.keyCode) && _ref2 <= 14)) {
+                  var _ref;
+                  if (e.type === 'keyup' && (13 <= (_ref = e.keyCode) && _ref <= 14)) {
                     return;
                   }
                   return oldCallback.apply(null, arguments);
@@ -4494,8 +4480,8 @@
           }
         })();
         _results = [];
-        for (_j = 0, _len2 = eventNames.length; _j < _len2; _j++) {
-          eventName = eventNames[_j];
+        for (_i = 0, _len = eventNames.length; _i < _len; _i++) {
+          eventName = eventNames[_i];
           _results.push($addEventListener(node, eventName, function() {
             var args;
             args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -4526,23 +4512,24 @@
       }
     },
     yield: function(name, node, _replaceContent) {
-      var content, contents, _j, _len2;
+      var content, contents, _i, _len;
       if (_replaceContent == null) {
         _replaceContent = !Batman.data(node, 'yielded');
       }
       Batman.DOM._yields[name] = node;
       if (contents = Batman.DOM._yieldContents[name]) {
         if (_replaceContent) {
-          node.innerHTML = '';
+          $setInnerHTML(node, '');
         }
-        for (_j = 0, _len2 = contents.length; _j < _len2; _j++) {
-          content = contents[_j];
+        for (_i = 0, _len = contents.length; _i < _len; _i++) {
+          content = contents[_i];
           if (!Batman.data(content, 'yielded')) {
             content = $isChildOf(node, content) ? content.cloneNode(true) : content;
             node.appendChild(content);
             Batman.data(content, 'yielded', true);
           }
         }
+        delete Batman.DOM._yieldContents[name];
         return Batman.data(node, 'yielded', true);
       }
     },
@@ -4560,6 +4547,46 @@
     },
     replace: function(name, node) {
       return Batman.DOM.contentFor(name, node, true);
+    },
+    unbindNode: $unbindNode = function(node) {
+      var eventListeners, eventName, listeners;
+      if (listeners = Batman.data(node, 'listeners')) {
+        for (eventName in listeners) {
+          eventListeners = listeners[eventName];
+          eventListeners.forEach(function(listener) {
+            return $removeEventListener(node, eventName, listener);
+          });
+        }
+      }
+      return Batman.removeData(node);
+    },
+    unbindTree: $unbindTree = function(node, unbindRoot) {
+      var child, _i, _len, _ref, _results;
+      if (unbindRoot == null) {
+        unbindRoot = true;
+      }
+      if ((node != null ? node.nodeType : void 0) !== 1) {
+        return;
+      }
+      if (unbindRoot) {
+        $unbindNode(node);
+      }
+      _ref = node.childNodes;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        child = _ref[_i];
+        _results.push($unbindTree(child));
+      }
+      return _results;
+    },
+    setInnerHTML: $setInnerHTML = function(node, html) {
+      $unbindTree(node, false);
+      return node != null ? node.innerHTML = html : void 0;
+    },
+    removeNode: $removeNode = function(node) {
+      var _ref;
+      $unbindTree(node);
+      return node != null ? (_ref = node.parentNode) != null ? _ref.removeChild(node) : void 0 : void 0;
     },
     valueForNode: function(node, value) {
       var isSetting;
@@ -4586,27 +4613,334 @@
           return node.value = value;
         default:
           if (isSetting) {
-            return node.innerHTML = value;
+            return $setInnerHTML(node, value);
           } else {
             return node.innerHTML;
           }
       }
     },
     nodeIsEditable: function(node) {
-      var _ref2;
-      return (_ref2 = node.nodeName.toUpperCase()) === 'INPUT' || _ref2 === 'TEXTAREA' || _ref2 === 'SELECT';
+      var _ref;
+      return (_ref = node.nodeName.toUpperCase()) === 'INPUT' || _ref === 'TEXTAREA' || _ref === 'SELECT';
     },
-    addEventListener: $addEventListener = (typeof window !== "undefined" && window !== null ? window.addEventListener : void 0) ? (function(node, eventName, callback) {
-      return node.addEventListener(eventName, callback, false);
-    }) : (function(node, eventName, callback) {
-      return node.attachEvent("on" + eventName, callback);
-    }),
-    removeEventListener: $removeEventListener = (typeof window !== "undefined" && window !== null ? window.removeEventListener : void 0) ? (function(elem, eventType, handler) {
-      return elem.removeEventListener(eventType, handler, false);
-    }) : (function(elem, eventType, handler) {
-      return elem.detachEvent('on' + eventType, handler);
-    })
+    addEventListener: $addEventListener = function(node, eventName, callback) {
+      var listeners;
+      if (!(listeners = Batman.data(node, 'listeners'))) {
+        listeners = Batman.data(node, 'listeners', {});
+      }
+      if (!listeners[eventName]) {
+        listeners[eventName] = new Batman.Set;
+      }
+      listeners[eventName].add(callback);
+      if ($hasAddEventListener) {
+        return node.addEventListener(eventName, callback, false);
+      } else {
+        return node.attachEvent("on" + eventName, callback);
+      }
+    },
+    removeEventListener: $removeEventListener = function(node, eventName, callback) {
+      var eventListeners, listeners;
+      if (listeners = Batman.data(node, 'listeners')) {
+        if (eventListeners = listeners[eventName]) {
+          eventListeners.remove(callback);
+        }
+      }
+      if ($hasAddEventListener) {
+        return node.removeEventListener(eventName, callback, false);
+      } else {
+        return node.detachEvent('on' + eventName, callback);
+      }
+    },
+    hasAddEventListener: $hasAddEventListener = !!(typeof window !== "undefined" && window !== null ? window.addEventListener : void 0)
   };
+  Batman.DOM.Style = (function() {
+    function Style(node, key, context) {
+      this.node = node;
+      this.key = key;
+      this.context = context;
+      this.reapplyOldStyles = __bind(this.reapplyOldStyles, this);
+      this.setStyle = __bind(this.setStyle, this);
+      this.bindSingleAttribute = __bind(this.bindSingleAttribute, this);
+      this.onItemsRemoved = __bind(this.onItemsRemoved, this);
+      this.onItemsAdded = __bind(this.onItemsAdded, this);
+      this.dataChange = __bind(this.dataChange, this);
+      this.oldStyles = {};
+      context.bind(node, key, this.dataChange, function() {});
+    }
+    Style.prototype.dataChange = function(value) {
+      var cssName, cssValue, key, keyValue, keypathContext, keypathValue, style, _i, _len, _ref, _ref2, _ref3, _results;
+      if (!value) {
+        this.reapplyOldStyles();
+        return;
+      }
+      if (typeof value === 'string' && (this.boundValueType = 'string')) {
+        this.reapplyOldStyles();
+        _ref = value.split(';');
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          style = _ref[_i];
+          _ref2 = style.split(':'), cssName = _ref2[0], cssValue = _ref2[1];
+          this.setStyle(cssName, cssValue);
+        }
+        return;
+      }
+      if (value instanceof Batman.Hash && (this.boundValueType = 'batman.hash')) {
+        if (this.styleHash) {
+          this.styleHash.event('itemsWereRemoved').removeHandler(this.onItemsRemoved);
+          this.styleHash.event('itemsWereAdded').removeHandler(this.onItemsAdded);
+        }
+        this.styleHash = value;
+        value.on('itemsWereAdded', this.onItemsAdded);
+        value.on('itemsWereRemoved', this.onItemsRemoved);
+        return value.keys().forEach(__bind(function(key) {
+          return this.onItemsAdded(key);
+        }, this));
+      } else if (value instanceof Object && (this.boundValueType = 'object')) {
+        this.reapplyOldStyles();
+        _results = [];
+        for (key in value) {
+          if (!__hasProp.call(value, key)) continue;
+          keyValue = value[key];
+          _ref3 = this.context.findKey(keyValue), keypathValue = _ref3[0], keypathContext = _ref3[1];
+          _results.push(keypathValue ? (this.bindSingleAttribute(key, keyValue), this.setStyle(key, keypathValue)) : this.setStyle(key, keyValue));
+        }
+        return _results;
+      }
+    };
+    Style.prototype.onItemsAdded = function(newKey) {
+      return this.setStyle(newKey, this.styleHash.get(newKey));
+    };
+    Style.prototype.onItemsRemoved = function(oldKey) {
+      return this.setStyle(oldKey, '');
+    };
+    Style.prototype.bindSingleAttribute = function(attr, keypath) {
+      var dataChange;
+      dataChange = __bind(function(value) {
+        return this.setStyle(attr, value);
+      }, this);
+      return this.context.bind(this.node, keypath, dataChange, function() {});
+    };
+    Style.prototype.setStyle = function(key, value) {
+      if (!key) {
+        return;
+      }
+      key = key.trim();
+      this.oldStyles[key] = this.node.style[key];
+      return this.node.style[key] = value ? value.trim() : "";
+    };
+    Style.prototype.reapplyOldStyles = function() {
+      var cssName, cssValue, _ref, _results;
+      _ref = this.oldStyles;
+      _results = [];
+      for (cssName in _ref) {
+        if (!__hasProp.call(_ref, cssName)) continue;
+        cssValue = _ref[cssName];
+        _results.push(this.setStyle(cssName, cssValue));
+      }
+      return _results;
+    };
+    return Style;
+  })();
+  Batman.DOM.Iterator = (function() {
+    Iterator.prototype.currentAddNumber = 0;
+    Iterator.prototype.queuedAddNumber = 0;
+    function Iterator(sourceNode, iteratorName, key, context, parentRenderer) {
+      this.iteratorName = iteratorName;
+      this.key = key;
+      this.context = context;
+      this.parentRenderer = parentRenderer;
+      this.arrayChanged = __bind(this.arrayChanged, this);
+      this.collectionChange = __bind(this.collectionChange, this);
+      this.nodeMap = new Batman.SimpleHash;
+      this.rendererMap = new Batman.SimpleHash;
+      this.prototypeNode = sourceNode.cloneNode(true);
+      this.prototypeNode.removeAttribute("data-foreach-" + iteratorName);
+      this.parentNode = sourceNode.parentNode;
+      this.siblingNode = sourceNode.nextSibling;
+      this.parentRenderer.on('parsed', function() {
+        return $removeNode(sourceNode);
+      });
+      this.addFunctions = [];
+      this.fragment = document.createDocumentFragment();
+      context.bind(sourceNode, key, this.collectionChange, function() {});
+    }
+    Iterator.prototype.collectionChange = function(newCollection) {
+      var key, value, _ref, _results;
+      if (this.collection) {
+        if (newCollection === this.collection) {
+          return;
+        }
+        this.nodeMap.forEach(function(item, node) {
+          return $removeNode(node);
+        });
+        this.nodeMap.clear();
+        this.rendererMap.forEach(function(item, renderer) {
+          return renderer.stop();
+        });
+        this.rendererMap.clear();
+        if (this.collection.isObservble && this.collection.toArray) {
+          this.collection.forget(this.arrayChanged);
+        } else if (this.collection.isEventEmitter) {
+          this.collection.event('itemsWereAdded').removeHandler(this.currentAddNumber);
+          this.collection.event('itemsWereRemoved').removeHandler(this.currentRemovedHandler);
+        }
+      }
+      this.collection = newCollection;
+      if (this.collection) {
+        if (this.collection.isObservable && this.collection.toArray) {
+          this.collection.observe('toArray', this.arrayChanged);
+        } else if (this.collection.isEventEmitter) {
+          this.collection.on('itemsWereAdded', this.currentAddedHandler = __bind(function() {
+            var i, item, items, _len, _results;
+            items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+            _results = [];
+            for (i = 0, _len = items.length; i < _len; i++) {
+              item = items[i];
+              _results.push(this.addItem(item, {
+                fragment: true,
+                addNumber: this.currentAddFunction + i
+              }));
+            }
+            return _results;
+          }, this));
+          this.collection.on('itemsWereRemoved', this.currentRemovedHandler = __bind(function() {
+            var i, item, items, _len, _results;
+            items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+            _results = [];
+            for (i = 0, _len = items.length; i < _len; i++) {
+              item = items[i];
+              _results.push(this.removeItem(item));
+            }
+            return _results;
+          }, this));
+        }
+        if (this.collection.toArray) {
+          return this.arrayChanged();
+        } else if (this.collection.forEach) {
+          return this.collection.forEach(__bind(function(item) {
+            return this.addItem(item);
+          }, this));
+        } else {
+          _ref = this.collection;
+          _results = [];
+          for (key in _ref) {
+            if (!__hasProp.call(_ref, key)) continue;
+            value = _ref[key];
+            _results.push(this.addItem(key));
+          }
+          return _results;
+        }
+      } else {
+        return developer.warn("Warning! data-foreach-" + this.iteratorName + " called with an undefined binding. Key was: " + this.key + ".");
+      }
+    };
+    Iterator.prototype.addItem = function(item, options) {
+      var childRenderer, finish, self;
+      if (options == null) {
+        options = {
+          fragment: true
+        };
+      }
+      options.addNumber = this.queuedAddNumber++;
+      this.parentRenderer.prevent('rendered');
+      finish = __bind(function() {
+        this.parentRenderer.allow('rendered');
+        return this.parentRenderer.fire('rendered');
+      }, this);
+      self = this;
+      childRenderer = new Batman.Renderer(this._nodeForItem(item), (function() {
+        return self.insertItem(item, this.node, options);
+      }), this.context.descend(item, this.iteratorName));
+      this.rendererMap.set(item, childRenderer);
+      childRenderer.on('rendered', finish);
+      return childRenderer.on('stopped', __bind(function() {
+        this.addFunctions[options.addNumber] = function() {};
+        this._processAddQueue();
+        return finish();
+      }, this));
+    };
+    Iterator.prototype.removeItem = function(item) {
+      var hideFunction, oldNode;
+      oldNode = this.nodeMap.unset(item);
+      if (oldNode) {
+        if (hideFunction = Batman.data(oldNode, 'hide')) {
+          return hideFunction.call(oldNode);
+        } else {
+          return $removeNode(oldNode);
+        }
+      }
+    };
+    Iterator.prototype.arrayChanged = function() {
+      var existingNode, item, newItemsInOrder, trackingNodeMap, _i, _len;
+      newItemsInOrder = this.collection.toArray();
+      trackingNodeMap = new Batman.SimpleHash;
+      for (_i = 0, _len = newItemsInOrder.length; _i < _len; _i++) {
+        item = newItemsInOrder[_i];
+        existingNode = this.nodeMap.get(item);
+        trackingNodeMap.set(item, true);
+        if (existingNode) {
+          this.insertItem(item, existingNode, {
+            fragment: false,
+            addNumber: this.queuedAddNumber++,
+            sync: true
+          });
+        } else {
+          this.addItem(item, {
+            fragment: false
+          });
+        }
+      }
+      return this.nodeMap.forEach(__bind(function(item, node) {
+        if (!trackingNodeMap.hasKey(item)) {
+          return this.removeItem(item);
+        }
+      }, this));
+    };
+    Iterator.prototype.insertItem = function(item, node, options) {
+      if (options == null) {
+        options = {};
+      }
+      if (this.nodeMap.get(item) !== node) {
+        this.addFunctions[options.addNumber] = function() {};
+      } else {
+        this.rendererMap.unset(item);
+        this.addFunctions[options.addNumber] = function() {
+          var show;
+          show = Batman.data(node, 'show');
+          if (typeof show === 'function') {
+            return show.call(node, {
+              before: this.siblingNode
+            });
+          } else {
+            if (options.fragment) {
+              return this.fragment.appendChild(node);
+            } else {
+              return this.parentNode.insertBefore(node, this.siblingNode);
+            }
+          }
+        };
+      }
+      return this._processAddQueue();
+    };
+    Iterator.prototype._nodeForItem = function(item) {
+      var newNode;
+      newNode = this.prototypeNode.cloneNode(true);
+      this.nodeMap.set(item, newNode);
+      return newNode;
+    };
+    Iterator.prototype._processAddQueue = function() {
+      var f;
+      while (!!(f = this.addFunctions[this.currentAddNumber])) {
+        this.addFunctions[this.currentAddNumber] = void 0;
+        f.call(this);
+        this.currentAddNumber++;
+      }
+      if (this.fragment && this.rendererMap.length === 0 && this.fragment.hasChildNodes()) {
+        this.parentNode.insertBefore(this.fragment, this.siblingNode);
+        this.fragment = document.createDocumentFragment();
+      }
+    };
+    return Iterator;
+  })();
   buntUndefined = function(f) {
     return function(value) {
       if (typeof value === 'undefined') {
@@ -4679,9 +5013,9 @@
       return value.meta.get(keypath);
     })
   };
-  _ref2 = ['capitalize', 'singularize', 'underscore', 'camelize'];
-  for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-    k = _ref2[_j];
+  _ref = ['capitalize', 'singularize', 'underscore', 'camelize'];
+  for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+    k = _ref[_i];
     filters[k] = buntUndefined(helpers[k]);
   }
   developer.addFilters();
@@ -4845,15 +5179,84 @@
   container = typeof exports !== "undefined" && exports !== null ? (module.exports = Batman, global) : (window.Batman = Batman, window);
   $mixin(container, Batman.Observable);
   Batman.exportHelpers = function(onto) {
-    var k, _k, _len3, _ref3;
-    _ref3 = ['mixin', 'unmixin', 'route', 'redirect', 'typeOf', 'redirect'];
-    for (_k = 0, _len3 = _ref3.length; _k < _len3; _k++) {
-      k = _ref3[_k];
+    var k, _j, _len2, _ref2;
+    _ref2 = ['mixin', 'unmixin', 'route', 'redirect', 'typeOf', 'redirect'];
+    for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+      k = _ref2[_j];
       onto["$" + k] = Batman[k];
     }
     return onto;
   };
   Batman.exportGlobals = function() {
     return Batman.exportHelpers(container);
+  };
+  Batman.Request.prototype.send = function(data) {
+    var options, _ref2;
+    options = {
+      url: this.get('url'),
+      type: this.get('method'),
+      dataType: this.get('type'),
+      data: data || this.get('data'),
+      username: this.get('username'),
+      password: this.get('password'),
+      beforeSend: __bind(function() {
+        return this.fire('loading');
+      }, this),
+      success: __bind(function(response, textStatus, xhr) {
+        this.set('status', xhr.status);
+        this.set('response', response);
+        return this.fire('success', response);
+      }, this),
+      error: __bind(function(xhr, status, error) {
+        this.set('status', xhr.status);
+        this.set('response', xhr.responseText);
+        xhr.request = this;
+        return this.fire('error', xhr);
+      }, this),
+      complete: __bind(function() {
+        return this.fire('loaded');
+      }, this)
+    };
+    if ((_ref2 = this.get('method')) === 'PUT' || _ref2 === 'POST') {
+      if (!this.get('formData')) {
+        options.contentType = this.get('contentType');
+      } else {
+        options.contentType = false;
+        options.processData = false;
+        options.data = this.constructor.objectToFormData(options.data);
+      }
+    }
+    return jQuery.ajax(options);
+  };
+  Batman.mixins.animation = {
+    show: function(addToParent) {
+      var jq, show, _ref2, _ref3;
+      jq = $(this);
+      show = function() {
+        return jq.show(600);
+      };
+      if (addToParent) {
+        if ((_ref2 = addToParent.append) != null) {
+          _ref2.appendChild(this);
+        }
+        if ((_ref3 = addToParent.before) != null) {
+          _ref3.parentNode.insertBefore(this, addToParent.before);
+        }
+        jq.hide();
+        setTimeout(show, 0);
+      } else {
+        show();
+      }
+      return this;
+    },
+    hide: function(removeFromParent) {
+      $(this).hide(600, __bind(function() {
+        var _ref2;
+        if (removeFromParent) {
+          return (_ref2 = this.parentNode) != null ? _ref2.removeChild(this) : void 0;
+        }
+      }, this));
+      return this;
+    }
   };
 }).call(this);

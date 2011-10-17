@@ -1,16 +1,14 @@
 window.Classifieds = class Classifieds extends Batman.App
 
   @navLinks: [
-    {href: "#!/ads/all", text: "All Listings"},
-    {href: "#!/ads/free", text: "Free"},
-    {href: "#!/ads/trade", text: "Trade"},
-    {href: "#!/ads/previous", text: "Previous Listings"}
+    {href: "#!/ads?filter=all", text: "All Listings"},
+    {href: "#!/ads?filter=free", text: "Free"},
+    {href: "#!/ads?filter=trade", text: "Trade"},
+    {href: "#!/ads?filter=previous", text: "Previous Listings"}
   ]
 
-  @root 'ads#all'
-  @route '/ads/:id', 'ads#show', resource: 'ads', action: 'show'
-  @route '/ads/:id/edit', 'ads#edit', resource: 'ads', action: 'edit'
-  @route '/ads/new', 'ads#new', resource: 'ads', action: 'new'
+  @resources 'ads'
+  @root 'ads#index'
   @route '/search', 'ads#search', resource: 'ads', action: 'search'
 
   @on 'run', ->
