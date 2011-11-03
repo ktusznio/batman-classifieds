@@ -1,11 +1,14 @@
 window.Classifieds = class Classifieds extends Batman.App
 
   @navLinks: [
-    {href: "#!/ads?filter=all", text: "All Listings"},
-    {href: "#!/ads?filter=free", text: "Free"},
-    {href: "#!/ads?filter=trade", text: "Trade"},
-    {href: "#!/ads?filter=previous", text: "Previous Listings"}
+    {href: "/ads?filter=all", text: "All Listings"},
+    {href: "/ads?filter=free", text: "Free"},
+    {href: "/ads?filter=trade", text: "Trade"},
+    {href: "/ads?filter=previous", text: "Previous Listings"}
   ]
+
+  unless Batman.StateHistory.isSupported()
+    @navLinks.forEach (x) -> x.href = "#!/#{x.href}"
 
   @resources 'ads'
   @root 'ads#index'
@@ -33,3 +36,5 @@ window.Classifieds = class Classifieds extends Batman.App
 
   @flashSuccess: (message) -> @set 'flash.success', message
   @flashError: (message) ->  @set 'flash.error', message
+
+  #@navLinkClicked: (element, event) -> Batman.redirect element.getAttribute['redirect']
